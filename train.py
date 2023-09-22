@@ -51,8 +51,8 @@ if __name__ == '__main__':
         train_cfg.model_folder = args.model_folder
 
     if args.batch_size:
-        train_cfg.bs = args.batch_size
-        val_cfg.bs = args.batch_size
+        train_cfg.bs = int(args.batch_size)
+        val_cfg.bs = int(args.batch_size)
 
     test_cfg = config.test
 

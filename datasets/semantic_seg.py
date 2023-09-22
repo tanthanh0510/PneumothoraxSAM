@@ -52,7 +52,7 @@ class PneumothoraxDataset(VisionDataset):
         ann = Image.open(os.path.join(self.ann_folder_name, img_name))
         if self.transforms is not None:
             img, ann = self.transforms(img, ann)
-        ann = np.array(ann)
+        ann = np.array(ann)/255
 
         if self.return_dict:
             data = dict(img_name=img_name, img=img, ann=ann,

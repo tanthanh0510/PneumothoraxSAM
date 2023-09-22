@@ -50,12 +50,12 @@ train:
   scheduler_name: 'cosine'
 
   # Runner
-  max_iter: 100000
-  log_iter: 20
-  eval_iter: 200
+  max_iter: 300000
+  log_iter: 500
+  eval_iter: 2000
   runner_name: 'sem_runner'
   # Dataloader
-  bs: 8 # 8
+  bs: 4 # 8
   num_workers: 2
   drop_last: True
   # Logger

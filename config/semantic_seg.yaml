@@ -35,7 +35,7 @@ train:
     ce:
       weight: 0.5
       params:  # ~ means None type, the initial params of loss could be identified here
-        # ignore_index: 255
+        ignore_index: 255
       label_one_hot: False
 
   # Optimizer

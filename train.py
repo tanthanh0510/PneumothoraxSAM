@@ -18,6 +18,7 @@ parser.add_argument('--tensorboard_folder',
 parser.add_argument('--log_folder', default=None, type=str)
 
 parser.add_argument('--model_folder', default=None, type=str)
+parser.add_argument('--batch_size', default=None, type=str)
 parser.add_argument('--cfg', default=None, type=str)
 
 if __name__ == '__main__':
@@ -31,20 +32,28 @@ if __name__ == '__main__':
             "./config/{task_name}.yaml".format(task_name=args.task_name))
 
     train_cfg = config.train
+    val_cfg = config.val
+
     if args.dataset_dir:
         train_cfg.dataset.params.dataset_dir = args.dataset_dir
+        val_cfg.dataset.params.dataset_dir = args.dataset_dir
+
     if args.ckpt_path:
         train_cfg.model.params.ckpt_path = args.ckpt_path
+
     if args.tensorboard_folder:
         train_cfg.tensorboard_folder = args.tensorboard_folder
+
     if args.log_folder:
         train_cfg.log_folder = args.log_folder
+
     if args.model_folder:
         train_cfg.model_folder = args.model_folder
 
-    val_cfg = config.val
-    if args.dataset_dir:
-        val_cfg.dataset.params.dataset_dir = args.dataset_dir
+    if args.batch_size:
+        train_cfg.bs = args.batch_size
+        val_cfg.bs = args.batch_size
+
     test_cfg = config.test
 
     train_dataset = get_dataset(train_cfg.dataset)

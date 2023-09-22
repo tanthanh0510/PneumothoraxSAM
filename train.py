@@ -42,16 +42,10 @@ if __name__ == '__main__':
     if args.model_folder:
         train_cfg.model_folder = args.model_folder
 
-    print('train_cfg: ', train_cfg)
-
     val_cfg = config.val
     if args.dataset_dir:
         val_cfg.dataset.params.dataset_dir = args.dataset_dir
-    print('val_cfg: ', val_cfg)
     test_cfg = config.test
-    if args.dataset_dir:
-        test_cfg.dataset.params.dataset_dir = args.dataset_dir
-    print('test_cfg: ', test_cfg)
 
     train_dataset = get_dataset(train_cfg.dataset)
     train_loader = DataLoader(train_dataset, batch_size=train_cfg.bs, shuffle=True, num_workers=train_cfg.num_workers,

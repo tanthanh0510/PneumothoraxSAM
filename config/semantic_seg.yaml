@@ -33,11 +33,11 @@ train:
   # Losses
   losses:
     combo_loss:
-      weights:
-        bce: 3
-        dice: 1
-        focal: 4
-      params: ~  # ~ means None type, the initial params of loss could be identified here
+      params: 
+        weights:
+          bce: 3
+          dice: 1
+          focal: 4  # ~ means None type, the initial params of loss could be identified here
       #   ignore_index: 255
       # label_one_hot: False
 

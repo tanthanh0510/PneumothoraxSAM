@@ -37,9 +37,9 @@ train:
         bce: 3
         dice: 1
         focal: 4
-      params:  # ~ means None type, the initial params of loss could be identified here
-        ignore_index: 255
-      label_one_hot: False
+      # params:  # ~ means None type, the initial params of loss could be identified here
+      #   ignore_index: 255
+      # label_one_hot: False
 
   # Optimizer
   opt_params:

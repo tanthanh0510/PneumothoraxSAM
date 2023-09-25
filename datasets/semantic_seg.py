@@ -4,6 +4,9 @@ import numpy as np
 import pandas as pd
 
 from PIL import Image
+
+import torch
+
 from torch.utils.data import Dataset
 from torchvision.datasets import VOCSegmentation, VisionDataset
 
@@ -63,6 +66,38 @@ class PneumothoraxDataset(VisionDataset):
 
     def __len__(self):
         return len(self.dataset)
+
+
+class PneumoSampler(torch.utils.data.Sampler):
+    def __init__(self, dataset_dir,
+                 image_set='train',
+                 demand_non_empty_prob=0.8):
+        assert demand_non_empty_prob > 0, 'frequency of non-empty images must be greater than zero'
+        self.positive_prob = demand_non_empty_prob
+
+        self.dataset = pd.read_csv(
+            os.path.join(dataset_dir, image_set + '.csv'))
+
+        self.positive_indices = self.dataset[self.dataset['existLabel']
+                                             == 1].index.values
+        self.negative_indices = self.dataset[self.dataset['existLabel']
+                                             == 0].index.values
+
+        self.n_positive = self.positive_indices.shape[0]
+        self.n_negative = int(
+            self.n_positive * (1 - self.positive_prob) / self.positive_prob)
+        print('n_positive: {n_positive}, n_negative: {n_negative}'.format(
+            n_positive=self.n_positive, n_negative=self.n_negative))
+
+    def __iter__(self):
+        negative_sample = np.random.choice(
+            self.negative_indices, self.n_negative)
+        shuffled = np.random.permutation(
+            np.hstack((negative_sample, self.positive_indices)))
+        return iter(shuffled.tolist())
+
+    def __len__(self):
+        return self.n_positive + self.n_negative
 
 
 class BaseSemanticDataset(VisionDataset):

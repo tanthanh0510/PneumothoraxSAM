@@ -1,7 +1,7 @@
 import argparse
 from omegaconf import OmegaConf
 from torch.utils.data import DataLoader
-from datasets import get_dataset
+from datasets import get_dataset, get_sampler
 from losses import get_losses
 from extend_sam import get_model, get_optimizer, get_scheduler, get_opt_pamams, get_runner
 
@@ -32,11 +32,14 @@ if __name__ == '__main__':
             "./config/{task_name}.yaml".format(task_name=args.task_name))
 
     train_cfg = config.train
+    sampler_cfg = train_cfg.get('sampler', None)
     val_cfg = config.val
 
     if args.dataset_dir:
         train_cfg.dataset.params.dataset_dir = args.dataset_dir
         val_cfg.dataset.params.dataset_dir = args.dataset_dir
+        if sampler_cfg:
+            sampler_cfg.params.dataset_dir = args.dataset_dir
 
     if args.ckpt_path:
         train_cfg.model.params.ckpt_path = args.ckpt_path
@@ -57,8 +60,18 @@ if __name__ == '__main__':
     test_cfg = config.test
 
     train_dataset = get_dataset(train_cfg.dataset)
-    train_loader = DataLoader(train_dataset, batch_size=train_cfg.bs, shuffle=True, num_workers=train_cfg.num_workers,
-                              drop_last=train_cfg.drop_last)
+    if sampler_cfg:
+        sampler = get_sampler(sampler_cfg)
+
+    # train_sampler = PneumoSampler(folds_distr_path, fold_id, non_empty_mask_prob)
+
+    if sampler_cfg:
+        train_loader = DataLoader(train_dataset, batch_size=train_cfg.bs, shuffle=False, num_workers=train_cfg.num_workers,
+                                  drop_last=train_cfg.drop_last, sampler=sampler)
+    else:
+        train_loader = DataLoader(train_dataset, batch_size=train_cfg.bs, shuffle=True, num_workers=train_cfg.num_workers,
+                                  drop_last=train_cfg.drop_last)
+    print('train_loader: ', len(train_loader))
     val_dataset = get_dataset(val_cfg.dataset)
     val_loader = DataLoader(val_dataset, batch_size=val_cfg.bs, shuffle=False, num_workers=val_cfg.num_workers,
                             drop_last=val_cfg.drop_last)

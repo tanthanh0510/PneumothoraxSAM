@@ -41,10 +41,12 @@ class OriHead(nn.Module):
         self.num_mask_tokens = num_multimask_outputs + 1
 
         self.output_upscaling = nn.Sequential(
-            nn.ConvTranspose2d(transformer_dim, transformer_dim // 4, kernel_size=2, stride=2),
+            nn.ConvTranspose2d(
+                transformer_dim, transformer_dim // 4, kernel_size=2, stride=2),
             LayerNorm2d(transformer_dim // 4),
             activation(),
-            nn.ConvTranspose2d(transformer_dim // 4, transformer_dim // 8, kernel_size=2, stride=2),
+            nn.ConvTranspose2d(transformer_dim // 4,
+                               transformer_dim // 8, kernel_size=2, stride=2),
             activation(),
         )
         self.output_hypernetworks_mlps = nn.ModuleList(
@@ -87,10 +89,12 @@ class OriHead(nn.Module):
         upscaled_embedding = self.output_upscaling(src)
         hyper_in_list: List[torch.Tensor] = []
         for i in range(self.num_mask_tokens):
-            hyper_in_list.append(self.output_hypernetworks_mlps[i](mask_tokens_out[:, i, :]))
+            hyper_in_list.append(
+                self.output_hypernetworks_mlps[i](mask_tokens_out[:, i, :]))
         hyper_in = torch.stack(hyper_in_list, dim=1)
         b, c, h, w = upscaled_embedding.shape
-        masks = (hyper_in @ upscaled_embedding.view(b, c, h * w)).view(b, -1, h, w)
+        masks = (hyper_in @ upscaled_embedding.view(b, c, h * w)
+                 ).view(b, -1, h, w)
 
         # Generate mask quality predictions
         iou_pred = self.iou_prediction_head(iou_token_out)
@@ -141,10 +145,12 @@ class SemSegHead(nn.Module):
         self.class_num = class_num
 
         self.output_upscaling = nn.Sequential(
-            nn.ConvTranspose2d(transformer_dim, transformer_dim // 4, kernel_size=2, stride=2),
+            nn.ConvTranspose2d(
+                transformer_dim, transformer_dim // 4, kernel_size=2, stride=2),
             LayerNorm2d(transformer_dim // 4),
             activation(),
-            nn.ConvTranspose2d(transformer_dim // 4, transformer_dim // 8, kernel_size=2, stride=2),
+            nn.ConvTranspose2d(transformer_dim // 4,
+                               transformer_dim // 8, kernel_size=2, stride=2),
             activation(),
         )
 
@@ -189,14 +195,21 @@ class SemSegHead(nn.Module):
         upscaled_embedding = self.output_upscaling(src)
         hyper_in_list: List[torch.Tensor] = []
         for i in range(self.class_num):
-            hyper_in_list.append(self.output_hypernetworks_mlps[i](mask_tokens_out[:, mask_scale, :]))
+            hyper_in_list.append(self.output_hypernetworks_mlps[i](
+                mask_tokens_out[:, mask_scale, :]))
         hyper_in = torch.stack(hyper_in_list, dim=1)
 
         b, c, h, w = upscaled_embedding.shape
-        masks = (hyper_in @ upscaled_embedding.view(b, c, h * w)).view(b, -1, h, w)  # B N H W, N is num of category
+        if self.class_num > 1:
+            masks = (hyper_in @ upscaled_embedding.view(b, c, h * w)
+                     ).view(b, -1, h, w)  # B N H W, N is num of category
+        else:
+            masks = (hyper_in @ upscaled_embedding.view(b, c, h * w)
+                     ).view(b, -1, h, w)  # B N H W, N is num of category
 
         # Generate mask quality predictions
-        iou_pred = self.iou_prediction_head(iou_token_out)  # B N H W, N is num of category
+        iou_pred = self.iou_prediction_head(
+            iou_token_out)  # B N H W, N is num of category
 
         return masks, iou_pred
 

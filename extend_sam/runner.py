@@ -69,6 +69,9 @@ class SemRunner(BaseRunner):
             masks_pred, iou_pred = self.model(images)
             masks_pred = F.interpolate(
                 masks_pred, self.original_size, mode="bilinear", align_corners=False)
+            # if self.model.num_classes == 1:
+            masks_pred = masks_pred.view(-1,
+                                         self.original_size, self.original_size)
 
             total_loss = torch.zeros(1).to(device)
             loss_dict = {}

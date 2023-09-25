@@ -10,7 +10,7 @@ train:
       fix_prompt_en: True
       fix_mask_de: False
       ckpt_path: 'sam_ckpt/sam_vit_b_01ec64.pth'
-      class_num: 2 # 20 + 1
+      class_num: 1 # 20 + 1
       model_type: 'vit_b'    # type should be in [vit_h, vit_b, vit_l, default]
   
   # Dataset
@@ -29,15 +29,24 @@ train:
       resize:
         params:
           size: [1024, 1024]
+        
+    # Sampler
+  sampler:
+    name: 'PneumoSampler'
+    params:
+      dataset_dir: 'input/dataset1024'
+      image_set: 'train'
+      demand_non_empty_prob: 0.8
 
   # Losses
   losses:
     combo_loss:
+      weight: 1.0
       params: 
         weights:
-          bce: 3
-          dice: 1
-          focal: 4  # ~ means None type, the initial params of loss could be identified here
+          bce: 3          
+          focal: 4
+          dice: 1  # ~ means None type, the initial params of loss could be identified here
       #   ignore_index: 255
       # label_one_hot: False
 

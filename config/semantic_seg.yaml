@@ -52,19 +52,20 @@ train:
 
   # Optimizer
   opt_params:
-    lr_default:  1e-3
-    wd_default: 1e-4
-    momentum: 0.9
+    lr_default:  1e-4
+    wd_default: 5e-6
+    # momentum: 0.9
     lr_list:  [ 1e-2, ]
     group_keys: [ [ 'mask_adapter.decoder_head.output_hypernetworks_mlps', ], ]
     wd_list:  [ 0.0, ]
-  opt_name: 'sgd' # 'sgd'
-  scheduler_name: 'cosine'
+
+  opt_name: 'adam' # 'sgd'
+  scheduler_name: 'single_step'
 
   # Runner
   max_iter: 15000
   log_iter: 500
-  eval_iter: 2000
+  eval_iter: 500
   runner_name: 'sem_runner'
   # Dataloader
   bs: 4 # 8
@@ -100,5 +101,19 @@ val:
 
 
 test:
-  need_test: False
+  need_test: True
 
+mask_binarizer:
+  name: TripletMaskBinarization
+  params:
+    triplets:
+      [
+        [0.75, 1000, 0.3],
+        [0.75, 1000, 0.4],
+        [0.75, 2000, 0.3],
+        [0.75, 2000, 0.4],
+        [0.6, 2000, 0.3],
+        [0.6, 2000, 0.4],
+        [0.6, 3000, 0.3],
+        [0.6, 3000, 0.4],
+      ]

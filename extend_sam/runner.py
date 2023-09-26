@@ -148,7 +148,7 @@ class SemRunner(BaseRunner):
                 "result": f'Score: {metrics[best_threshold]:.5} at threshold {best_threshold}'}
             write_log(iteration=iteration, log_path=log_path, log_data=tmp,
                       status=self.exist_status[0],
-                      writer=writer, timer=self.train_timer)
+                      writer=None, timer=self.train_timer)
         self.model.train()
         self.eval_timer.end()
         return metrics, metrics[best_threshold]

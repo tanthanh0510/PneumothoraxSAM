@@ -52,10 +52,10 @@ train:
 
   # Optimizer
   opt_params:
-    lr_default:  1e-4
+    lr_default:  5e-4
     wd_default: 5e-6
     # momentum: 0.9
-    lr_list:  [ 1e-2, ]
+    lr_list:  [ 5e-4, ]
     group_keys: [ [ 'mask_adapter.decoder_head.output_hypernetworks_mlps', ], ]
     wd_list:  [ 0.0, ]
 

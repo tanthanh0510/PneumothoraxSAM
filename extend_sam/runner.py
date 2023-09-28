@@ -60,12 +60,6 @@ class SemRunner(BaseRunner):
             writer = SummaryWriter(tensorboard_dir)
         # train
         print("Start training")
-        # print total parameters and trainable parameters in model
-        total_params = sum(p.numel() for p in self.model.parameters())
-        print(f'{total_params:,} total parameters.')
-        total_trainable_params = sum(
-            p.numel() for p in self.model.parameters() if p.requires_grad)
-        print(f'{total_trainable_params:,} training parameters.')
         for iteration in range(cfg.max_iter):
             images, labels = train_iterator.get()
             images, labels = images.to(device), labels.to(device).long()

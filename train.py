@@ -80,9 +80,26 @@ if __name__ == '__main__':
     # according the model name to get the adapted model
     model = get_model(model_name=train_cfg.model.sam_name,
                       **train_cfg.model.params)
-    opt_params = get_opt_pamams(model, lr_list=train_cfg.opt_params.lr_list, group_keys=train_cfg.opt_params.group_keys,
-                                wd_list=train_cfg.opt_params.wd_list)
-    optimizer = get_optimizer(opt_name=train_cfg.opt_name, params=opt_params,
+    # opt_params = get_opt_pamams(model, lr_list=train_cfg.opt_params.lr_list, group_keys=train_cfg.opt_params.group_keys,
+    #                             wd_list=train_cfg.opt_params.wd_list)
+    # print('opt_params: ', opt_params)
+    # print total parameters and trainable parameters in model
+    total_params = sum(p.numel() for p in model.parameters())
+    print(f'{total_params:,} total parameters.')
+    total_trainable_params = sum(
+        p.numel() for p in model.parameters() if p.requires_grad)
+    print(f'{total_trainable_params:,} training parameters.')
+    # set all params to be trainable
+    for param in model.parameters():
+        print(param)
+        param.requires_grad = True
+    total_trainable_params = sum(
+        p.numel() for p in model.parameters() if p.requires_grad)
+    print(f'{total_trainable_params:,} training parameters.')
+    for name, value in model.named_parameters():
+        print(name, value.requires_grad)
+
+    optimizer = get_optimizer(opt_name=train_cfg.opt_name, params=model.parameters(),
                               lr=train_cfg.opt_params.lr_default, weight_decay=train_cfg.opt_params.wd_default)
     scheduler = get_scheduler(
         optimizer=optimizer, lr_scheduler=train_cfg.scheduler_name)

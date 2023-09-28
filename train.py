@@ -142,6 +142,7 @@ for epoch in range(start_epoch, num_epochs):
             loss = seg_loss(pred, gt2D) + ce_loss(pred, gt2D.float())
             val_loss += loss.item()
         val_loss /= step
+        print("val_loss: ", val_loss)
         pBarVal.set_postfix(loss=loss.item())
         val_losses.append(val_loss)
         if val_loss < best_val_loss:
@@ -152,7 +153,7 @@ for epoch in range(start_epoch, num_epochs):
                 "epoch": epoch,
             }
             torch.save(checkpoint, os.path.join(model_save_path, "sam_model_val_best.pth"))
-        
+    print("epoch_loss: ", epoch_loss)   
     if epoch_loss < best_loss:
         best_loss = epoch_loss
         checkpoint = {

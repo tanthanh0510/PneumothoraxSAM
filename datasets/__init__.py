@@ -1,30 +1,19 @@
-from .detection import BaseDetectionDataset
-from .instance_seg import BaseInstanceDataset
 from .semantic_seg import (
-    BaseSemanticDataset,
-    VOCSemanticDataset,
-    TorchVOCSegmentation,
     PneumothoraxDataset,
     PneumoSampler
 )
 from .transforms import get_transforms
 
-segment_datasets = {'base_ins': BaseInstanceDataset, 'base_sem': BaseSemanticDataset,
-                    'voc_sem': VOCSemanticDataset, 'torch_voc_sem': TorchVOCSegmentation,
-                    'PneumothoraxDataset': PneumothoraxDataset}
+segment_datasets = {'PneumothoraxDataset': PneumothoraxDataset}
 
 samplers = {'PneumoSampler': PneumoSampler}
-
-det_dataset = {'base_det': BaseDetectionDataset, }
 
 
 def get_dataset(cfg):
     name = cfg.name
-    assert name in segment_datasets or name in det_dataset, \
+    assert name in segment_datasets, \
         print('{name} is not supported, please implement it first.'.format(name=name))
     transform = get_transforms(cfg.transforms)
-    if name in det_dataset:
-        return det_dataset[name](**cfg.params, transform=transform)
     target_transform = get_transforms(cfg.target_transforms)
     return segment_datasets[name](**cfg.params, transform=transform, target_transform=target_transform)
 

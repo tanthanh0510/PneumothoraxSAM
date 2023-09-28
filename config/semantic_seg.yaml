@@ -3,15 +3,10 @@ train:
 
   # Model
   model:
-    sam_name: 'sem_sam'
+    sam_name: 'pneu_sam'
     params:
-      # Fix the a part of parameters in SAM
-      fix_img_en: False
-      fix_prompt_en: True
-      fix_mask_de: False
       ckpt_path: 'sam_ckpt/sam_vit_b_01ec64.pth'
-      class_num: 1 # 20 + 1
-      model_type: 'vit_b'    # type should be in [vit_h, vit_b, vit_l, default]
+      model_type: 'vit_b'
   
   # Dataset
   dataset:
@@ -95,7 +90,7 @@ val:
         params:
           size: [1024, 1024]
 
-  bs: 8
+  bs: 2
   num_workers: 2
   drop_last: True
 

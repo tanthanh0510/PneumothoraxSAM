@@ -1,9 +1,8 @@
 from typing import DefaultDict
 from datasets import Iterator
-from .utils import Average_Meter, Timer, print_and_save_log, mIoUOnline, get_numpy_from_tensor, save_model, write_log, \
-    check_folder, one_hot_embedding_3d
+from .utils import Average_Meter, Timer, print_and_save_log, save_model, write_log, \
+    check_folder
 import torch
-import cv2
 import torch.nn.functional as F
 import os
 import torch.nn as nn
@@ -25,15 +24,12 @@ class BaseRunner():
         except KeyError:
             use_gpu = '0'
         self.the_number_of_gpu = len(use_gpu.split(','))
-        self.original_size = self.model.img_adapter.sam_img_encoder.img_size
+        self.original_size = self.model.image_encoder.img_size
         if self.the_number_of_gpu > 1:
             self.model = nn.DataParallel(self.model)
 
 
 class SemRunner(BaseRunner):
-    # def __init__(self, **kwargs):
-    #     super().__init__(kwargs)
-
     def __init__(self, model, optimizer, losses, train_loader, val_loader, scheduler, binarizer_fn=None):
         super().__init__(model, optimizer, losses,
                          train_loader, val_loader, scheduler, binarizer_fn)
@@ -61,14 +57,13 @@ class SemRunner(BaseRunner):
         # train
         print("Start training")
         for iteration in range(cfg.max_iter):
-            images, labels = train_iterator.get()
+            images, labels, boxes, _ = train_iterator.get()
+            print('images: ', images.shape)
+            print('labels: ', labels.shape)
+            print('boxes: ', boxes.shape)
             images, labels = images.to(device), labels.to(device).long()
-            masks_pred, iou_pred = self.model(images)
-            masks_pred = F.interpolate(
-                masks_pred, self.original_size, mode="bilinear", align_corners=False)
-            # if self.model.num_classes == 1:
-            masks_pred = masks_pred.view(-1,
-                                         self.original_size, self.original_size)
+            boxes_np = boxes.detach().cpu().numpy()
+            masks_pred = self.model(images, boxes_np)
 
             total_loss = torch.zeros(1).to(device)
             loss_dict = {}

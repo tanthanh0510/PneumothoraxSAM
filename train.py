@@ -90,14 +90,8 @@ if __name__ == '__main__':
         p.numel() for p in model.parameters() if p.requires_grad)
     print(f'{total_trainable_params:,} training parameters.')
     # set all params to be trainable
-    for param in model.parameters():
-        print(param)
-        param.requires_grad = True
-    total_trainable_params = sum(
-        p.numel() for p in model.parameters() if p.requires_grad)
-    print(f'{total_trainable_params:,} training parameters.')
-    for name, value in model.named_parameters():
-        print(name, value.requires_grad)
+    # for param in model.parameters():
+    #     param.requires_grad = True
 
     optimizer = get_optimizer(opt_name=train_cfg.opt_name, params=model.parameters(),
                               lr=train_cfg.opt_params.lr_default, weight_decay=train_cfg.opt_params.wd_default)

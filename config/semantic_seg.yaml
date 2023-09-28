@@ -6,7 +6,7 @@ train:
     sam_name: 'sem_sam'
     params:
       # Fix the a part of parameters in SAM
-      fix_img_en: True
+      fix_img_en: False
       fix_prompt_en: True
       fix_mask_de: False
       ckpt_path: 'sam_ckpt/sam_vit_b_01ec64.pth'
@@ -56,7 +56,7 @@ train:
     wd_default: 5e-6
     # momentum: 0.9
     lr_list:  [ 5e-4, ]
-    group_keys: [ [ 'mask_adapter.decoder_head.output_hypernetworks_mlps', ], ]
+    group_keys: [ [ 'ori_sam.image_encoder', 'mask_adapter.decoder_head.output_hypernetworks_mlps', ], ]
     wd_list:  [ 0.0, ]
 
   opt_name: 'adam' # 'sgd'

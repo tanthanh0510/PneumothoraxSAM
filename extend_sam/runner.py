@@ -113,17 +113,11 @@ class SemRunner(BaseRunner):
         # eval_metric = mIoUOnline(class_names=class_names)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         with torch.no_grad():
-            for index, (images, labels) in enumerate(self.val_loader):
-                images = images.to(device)
-                labels = labels.to(device)
-                masks_pred, iou_pred = self.model(images)
-                masks_pred = F.interpolate(
-                    masks_pred, self.original_size, mode="bilinear", align_corners=False)
-            # if self.model.num_classes == 1:
-                masks_pred = masks_pred.view(-1,
-                                             self.original_size, self.original_size)
-                predictions = torch.sigmoid(masks_pred)
-                mask_generator = self.binarizer_fn.transform(predictions)
+            for index, (images, labels, boxes, _) in enumerate(self.val_loader):
+                images, labels = images.to(device), labels.to(device).long()
+                boxes_np = boxes.detach().cpu().numpy()
+                masks_pred = self.model(images, boxes_np)
+                mask_generator = self.binarizer_fn.transform(masks_pred)
                 for curr_threshold, curr_mask in zip(used_thresholds, mask_generator):
                     curr_metric = self.eval_fn(curr_mask, labels).item()
                     curr_threshold = tuple(curr_threshold)

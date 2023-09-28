@@ -4,7 +4,7 @@ import torch.nn as nn
 # example
 # class CustormLoss(nn.Module):
 #     def __init__(self):
-#         pass 
+#         pass
 
 #     def forward(self, x, y):
 #         pass
@@ -24,20 +24,20 @@ eps = 1e-6
 
 def soft_dice_loss(outputs, targets, per_image=False, per_channel=False):
     batch_size, n_channels = outputs.size(0), outputs.size(1)
-    
     eps = 1e-6
     n_parts = 1
     if per_image:
         n_parts = batch_size
     if per_channel:
         n_parts = batch_size * n_channels
-    
+
     dice_target = targets.contiguous().view(n_parts, -1).float()
     dice_output = outputs.contiguous().view(n_parts, -1)
     intersection = torch.sum(dice_output * dice_target, dim=1)
     union = torch.sum(dice_output, dim=1) + torch.sum(dice_target, dim=1) + eps
     loss = (1 - (2 * intersection + eps) / union).mean()
     return loss
+
 
 def dice_metric(preds, trues, per_image=False, per_channel=False):
     preds = preds.float()
@@ -53,7 +53,8 @@ def jaccard(outputs, targets, per_image=False, non_empty=False, min_pixels=5):
     dice_output = outputs.contiguous().view(batch_size, -1)
     target_sum = torch.sum(dice_target, dim=1)
     intersection = torch.sum(dice_output * dice_target, dim=1)
-    losses = 1 - (intersection + eps) / (torch.sum(dice_output + dice_target, dim=1) - intersection + eps)
+    losses = 1 - (intersection + eps) / (torch.sum(dice_output +
+                                                   dice_target, dim=1) - intersection + eps)
     if non_empty:
         assert per_image == True
         non_empty_images = 0
@@ -112,7 +113,7 @@ class StableBCELoss(nn.Module):
 
 
 class ComboLoss(nn.Module):
-    def __init__(self, weights, per_image=False, channel_weights=[1, 0.5, 0.5], channel_losses=None):
+    def __init__(self, weights, per_image=False, channel_weights=[1], channel_losses=None):
         super().__init__()
         self.weights = weights
         self.bce = StableBCELoss()
@@ -142,14 +143,19 @@ class ComboLoss(nn.Module):
                 continue
             val = 0
             if k in self.per_channel:
-                channels = targets.size(1)
-                for c in range(channels):
-                    if not self.channel_losses or k in self.channel_losses[c]:
-                        val += self.channel_weights[c] * self.mapping[k](sigmoid_input[:, c, ...] if k in self.expect_sigmoid else outputs[:, c, ...],
-                                               targets[:, c, ...])
-
+                if len(targets.shape) != 3:
+                    channels = targets.size(1)
+                    for c in range(channels):
+                        if not self.channel_losses or k in self.channel_losses[c]:
+                            val += self.channel_weights[c] * self.mapping[k](sigmoid_input[:, ...] if k in self.expect_sigmoid else outputs[:, c, ...],
+                                                                             targets[:, c, ...])
+                else:
+                    if not self.channel_losses or k in self.channel_losses[0]:
+                        val += self.channel_weights[0] * self.mapping[k](sigmoid_input[:, ...] if k in self.expect_sigmoid else outputs[:, 0, ...],
+                                                                         targets[:, ...])
             else:
-                val = self.mapping[k](sigmoid_input if k in self.expect_sigmoid else outputs, targets)
+                val = self.mapping[k](
+                    sigmoid_input if k in self.expect_sigmoid else outputs, targets)
 
             self.values[k] = val
             loss += self.weights[k] * val
@@ -183,7 +189,8 @@ def lovasz_hinge(logits, labels, per_image=True, ignore=None):
         loss = mean(lovasz_hinge_flat(*flatten_binary_scores(log.unsqueeze(0), lab.unsqueeze(0), ignore))
                     for log, lab in zip(logits, labels))
     else:
-        loss = lovasz_hinge_flat(*flatten_binary_scores(logits, labels, ignore))
+        loss = lovasz_hinge_flat(
+            *flatten_binary_scores(logits, labels, ignore))
     return loss
 
 
@@ -233,9 +240,10 @@ def lovasz_sigmoid(probas, labels, per_image=False, ignore=None):
     """
     if per_image:
         loss = mean(lovasz_sigmoid_flat(*flatten_binary_scores(prob.unsqueeze(0), lab.unsqueeze(0), ignore))
-                          for prob, lab in zip(probas, labels))
+                    for prob, lab in zip(probas, labels))
     else:
-        loss = lovasz_sigmoid_flat(*flatten_binary_scores(probas, labels, ignore))
+        loss = lovasz_sigmoid_flat(
+            *flatten_binary_scores(probas, labels, ignore))
     return loss
 
 
@@ -254,8 +262,10 @@ def lovasz_sigmoid_flat(probas, labels):
     loss = torch.dot(errors_sorted, Variable(lovasz_grad(fg_sorted)))
     return loss
 
+
 def symmetric_lovasz(outputs, targets, ):
     return (lovasz_hinge(outputs, targets) + lovasz_hinge(-outputs, 1 - targets)) / 2
+
 
 def mean(l, ignore_nan=False, empty=0):
     """
@@ -289,6 +299,7 @@ class LovaszLoss(nn.Module):
         targets = targets.contiguous()
         return symmetric_lovasz(outputs, targets)
 
+
 class LovaszLossSigmoid(nn.Module):
     def __init__(self, ignore_index=255, per_image=True):
         super().__init__()
@@ -318,4 +329,3 @@ class FocalLoss2d(nn.Module):
         targets = torch.clamp(targets, eps, 1. - eps)
         pt = (1 - targets) * (1 - outputs) + targets * outputs
         return (-(1. - pt) ** self.gamma * torch.log(pt)).mean()
-    

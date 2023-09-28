@@ -3,15 +3,10 @@ train:
 
   # Model
   model:
-    sam_name: 'sem_sam'
+    sam_name: 'pneu_sam'
     params:
-      # Fix the a part of parameters in SAM
-      fix_img_en: True
-      fix_prompt_en: True
-      fix_mask_de: False
       ckpt_path: 'sam_ckpt/sam_vit_b_01ec64.pth'
-      class_num: 2 # 20 + 1
-      model_type: 'vit_b'    # type should be in [vit_h, vit_b, vit_l, default]
+      model_type: 'vit_b'
   
   # Dataset
   dataset:
@@ -29,36 +24,46 @@ train:
       resize:
         params:
           size: [1024, 1024]
+        
+    # Sampler
+  sampler:
+    name: 'PneumoSampler'
+    params:
+      dataset_dir: 'input/dataset1024'
+      image_set: 'train'
+      demand_non_empty_prob: 0.8
 
   # Losses
   losses:
     combo_loss:
+      weight: 1.0
       params: 
         weights:
-          bce: 3
-          dice: 1
-          focal: 4  # ~ means None type, the initial params of loss could be identified here
+          bce: 3          
+          focal: 4
+          dice: 1  # ~ means None type, the initial params of loss could be identified here
       #   ignore_index: 255
       # label_one_hot: False
 
   # Optimizer
   opt_params:
-    lr_default:  1e-3
-    wd_default: 1e-4
-    momentum: 0.9
-    lr_list:  [ 1e-2, ]
-    group_keys: [ [ 'mask_adapter.decoder_head.output_hypernetworks_mlps', ], ]
+    lr_default:  5e-4
+    wd_default: 5e-6
+    # momentum: 0.9
+    lr_list:  [ 5e-4, ]
+    group_keys: [ [ 'ori_sam.image_encoder', 'mask_adapter.decoder_head.output_hypernetworks_mlps', ], ]
     wd_list:  [ 0.0, ]
-  opt_name: 'sgd' # 'sgd'
-  scheduler_name: 'cosine'
+
+  opt_name: 'adam' # 'sgd'
+  scheduler_name: 'single_step'
 
   # Runner
   max_iter: 15000
   log_iter: 500
-  eval_iter: 2000
+  eval_iter: 500
   runner_name: 'sem_runner'
   # Dataloader
-  bs: 4 # 8
+  bs: 2 # 8
   num_workers: 2
   drop_last: True
   # Logger
@@ -85,11 +90,25 @@ val:
         params:
           size: [1024, 1024]
 
-  bs: 8
+  bs: 2
   num_workers: 2
   drop_last: True
 
 
 test:
-  need_test: False
+  need_test: True
 
+mask_binarizer:
+  name: TripletMaskBinarization
+  params:
+    triplets:
+      [
+        [0.75, 1000, 0.3],
+        [0.75, 1000, 0.4],
+        [0.75, 2000, 0.3],
+        [0.75, 2000, 0.4],
+        [0.6, 2000, 0.3],
+        [0.6, 2000, 0.4],
+        [0.6, 3000, 0.3],
+        [0.6, 3000, 0.4],
+      ]

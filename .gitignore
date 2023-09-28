@@ -160,3 +160,5 @@ cython_debug/
 #.idea/
 input/
 sam_ckpt/
+experiment
+check

@@ -7,7 +7,7 @@ class MaskBinarization:
 
 
 class TripletMaskBinarization(MaskBinarization):
-    def __init__(self, triplets, with_channels=False):
+    def __init__(self, triplets, with_channels=True):
         super().__init__()
         self.thresholds = triplets
         self.dims = (2, 3) if with_channels else (1, 2)

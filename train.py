@@ -126,10 +126,7 @@ if __name__ == '__main__':
     # according the model name to get the adapted model
     model = get_model(model_name=train_cfg.model.sam_name,
                       **train_cfg.model.params)
-    # opt_params = get_opt_pamams(model, lr_list=train_cfg.opt_params.lr_list, group_keys=train_cfg.opt_params.group_keys,
-    #                             wd_list=train_cfg.opt_params.wd_list)
-    # print('opt_params: ', opt_params)
-    # print total parameters and trainable parameters in model
+
     total_params = sum(p.numel() for p in model.parameters())
     print(f'{total_params:,} total parameters.')
     total_trainable_params = sum(

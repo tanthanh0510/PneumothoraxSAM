@@ -29,14 +29,11 @@ class PneuSam(nn.Module):
                 box, dtype=torch.float32, device=image.device)
             if len(box_torch.shape) == 2:
                 box_torch = box_torch[:, None, :]  # (B, 1, 4)
-            print('box_torch: ', box_torch.shape)
             sparse_embeddings, dense_embeddings = self.prompt_encoder(
                 points=None,
                 boxes=box_torch,
                 masks=None,
             )
-            print('sparse_embeddings: ', sparse_embeddings.shape)
-            print('dense_embeddings: ', dense_embeddings.shape)
 
         low_res_masks, _ = self.mask_decoder(
             image_embeddings=image_embedding,  # (B, 256, 64, 64)

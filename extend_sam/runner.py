@@ -55,16 +55,14 @@ class SemRunner(BaseRunner):
             from torch.utils.tensorboard import SummaryWriter
             writer = SummaryWriter(tensorboard_dir)
         # train
-        print("Start training")
+        print(f"Start training {cfg.max_iter} iterations")
+        print(f"log every {cfg.log_iter} iterations")
+        print(f"eval every {cfg.eval_iter} iterations")
         for iteration in range(cfg.max_iter):
             images, labels, boxes, _ = train_iterator.get()
-            print('images: ', images.shape)
-            print('labels: ', labels.shape)
-            print('boxes: ', boxes.shape)
             images, labels = images.to(device), labels.to(device).long()
             boxes_np = boxes.detach().cpu().numpy()
             masks_pred = self.model(images, boxes_np)
-
             total_loss = torch.zeros(1).to(device)
             loss_dict = {}
             self._compute_loss(total_loss, loss_dict, masks_pred, labels, cfg)

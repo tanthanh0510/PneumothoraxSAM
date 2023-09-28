@@ -63,7 +63,6 @@ class PneumothoraxDataset(VisionDataset):
             np.max(img) <= 1.0 and np.min(img) >= 0.0
         ), "image should be normalized to [0, 1]"
         ann_file_name = os.path.join(self.ann_folder_name, name)
-        print('ann_file_name: ', ann_file_name)
         ann = io.imread(ann_file_name)
         ann = ann/255
         H, W = ann.shape

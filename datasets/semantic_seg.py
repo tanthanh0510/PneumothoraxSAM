@@ -28,19 +28,16 @@ class PneumothoraxDataset(VisionDataset):
         |   |   ├── val.csv
     """
 
-    def __init__(self, dataset_dir, transform, target_transform,
+    def __init__(self, dataset_dir,
                  image_set='train',
                  data_prefix: dict = dict(img_path='train', ann_path='mask'),
                  return_dict=False):
-        super(PneumothoraxDataset, self).__init__(root=dataset_dir, transform=transform,
-                                                  target_transform=target_transform)
+        super(PneumothoraxDataset, self).__init__(root=dataset_dir)
         self.class_names = ['pneumothorax']
         self.dataset = pd.read_csv(
             os.path.join(dataset_dir, image_set + '.csv'))
         # self.dataset = self.dataset[self.dataset['existLabel'] == 1]
         self.dataset_dir = dataset_dir
-        self.transform = transform
-        self.target_transform = target_transform
         self.return_dict = return_dict
         self.img_folder_name = os.path.join(
             dataset_dir, data_prefix['img_path'])
@@ -95,7 +92,7 @@ class PneumoSampler(torch.utils.data.Sampler):
                  demand_non_empty_prob=0.8):
         assert demand_non_empty_prob > 0, 'frequency of non-empty images must be greater than zero'
         self.positive_prob = demand_non_empty_prob
-
+        print("dataset_dir", dataset_dir)
         self.dataset = pd.read_csv(
             os.path.join(dataset_dir, image_set + '.csv'))
 

@@ -133,8 +133,7 @@ class MaskDecoder(nn.Module):
 
         # Expand per-image data in batch direction to be per-mask
         if image_embeddings.shape[0] != tokens.shape[0]:
-            src = torch.repeat_interleave(
-                image_embeddings, tokens.shape[0], dim=0)
+            src = torch.repeat_interleave(image_embeddings, tokens.shape[0], dim=0)
         else:
             src = image_embeddings
         src = src + dense_prompt_embeddings
@@ -144,7 +143,7 @@ class MaskDecoder(nn.Module):
         # Run the transformer
         hs, src = self.transformer(src, pos_src, tokens)
         iou_token_out = hs[:, 0, :]
-        mask_tokens_out = hs[:, 1: (1 + self.num_mask_tokens), :]
+        mask_tokens_out = hs[:, 1 : (1 + self.num_mask_tokens), :]
 
         # Upscale mask embeddings and predict masks using the mask tokens
         src = src.transpose(1, 2).view(b, c, h, w)
@@ -156,8 +155,7 @@ class MaskDecoder(nn.Module):
             )
         hyper_in = torch.stack(hyper_in_list, dim=1)
         b, c, h, w = upscaled_embedding.shape
-        masks = (hyper_in @ upscaled_embedding.view(b, c, h * w)
-                 ).view(b, -1, h, w)
+        masks = (hyper_in @ upscaled_embedding.view(b, c, h * w)).view(b, -1, h, w)
 
         # Generate mask quality predictions
         iou_pred = self.iou_prediction_head(iou_token_out)

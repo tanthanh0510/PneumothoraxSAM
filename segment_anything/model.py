@@ -2,27 +2,18 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-from .segment_anything import sam_model_registry
-
 
 class PneuSam(nn.Module):
     def __init__(
-        self, ckpt_path=None, model_type='vit_b',
-    ):
+        self, image_encoder, mask_decoder, prompt_encoder):
         super().__init__()
-        sam_model = sam_model_registry[model_type](
-            checkpoint=ckpt_path)
-        self.image_encoder = sam_model.image_encoder
-        self.mask_decoder = sam_model.mask_decoder
-        # for param in self.image_encoder.parameters():
-        #     param.requires_grad = False
-        self.prompt_encoder = sam_model.prompt_encoder
-        # freeze prompt encoder
+        self.image_encoder = image_encoder
+        self.mask_decoder = mask_decoder
+        self.prompt_encoder = prompt_encoder
         for param in self.prompt_encoder.parameters():
             param.requires_grad = False
 
     def forward(self, image, box):  # (B, 256, 64, 64)
-        # do not compute gradients for prompt encoder
         with torch.no_grad():
             image_embedding = self.image_encoder(image)
             box_torch = torch.as_tensor(

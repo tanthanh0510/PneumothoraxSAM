@@ -1,148 +1,136 @@
+import os
 import argparse
-import random
-from matplotlib import pyplot as plt
-from omegaconf import OmegaConf
+from tqdm import tqdm
+from datetime import datetime
+import matplotlib.pyplot as plt
+
+import monai
+import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader
-from datasets import get_dataset, get_sampler
-from losses import get_losses
-from extend_sam import get_model, get_optimizer, get_scheduler, get_runner
-from utils.mask_binarizers import get_mask_binarizes
-import numpy as np
+import torch.nn.functional as F
 
-supported_tasks = ['detection', 'semantic_seg', 'instance_seg']
+from segment_anything import sam_model_registry
+from segment_anything.model import PneuSam
+from datasets.semantic_seg import PneumothoraxDataset, PneumoSampler
+
+# set seeds
+torch.manual_seed(49)
+torch.cuda.empty_cache()
+
 parser = argparse.ArgumentParser()
-parser.add_argument('--task_name', default='semantic_seg', type=str)
-
 parser.add_argument(
-    '--ckpt_path', default=None, type=str)
-parser.add_argument('--dataset_dir', default=None, type=str)
+    "-dir_dataset",
+    type=str,
+    default="input/dataset1024",
+    help="dir dataset",
+)
+parser.add_argument("-task_name", type=str, default="SAM-ViT-B")
+parser.add_argument("-model_type", type=str, default="vit_b")
+parser.add_argument(
+    "-checkpoint", type=str, default="sam_ckpt/sam_vit_b_01ec64.pth"
+)
+# parser.add_argument('-device', type=str, default='cuda:0')
+parser.add_argument("-pretrain_model_path", type=str, default="")
+parser.add_argument("-work_dir", type=str, default="./experiment")
+# train
+parser.add_argument("-num_epochs", type=int, default=500)
+parser.add_argument("-batch_size", type=int, default=2)
+parser.add_argument("-num_workers", type=int, default=2)
+# Optimizer parameters
+parser.add_argument(
+    "-weight_decay", type=float, default=0.01, help="weight decay (default: 0.01)"
+)
+parser.add_argument(
+    "-lr", type=float, default=0.0001, metavar="LR", help="learning rate (absolute lr)"
+)
+parser.add_argument("-use_amp", action="store_true", default=False, help="use amp")
+parser.add_argument("--device", type=str, default="cuda:0")
+args = parser.parse_args()
 
-parser.add_argument('--tensorboard_folder',
-                    default=None, type=str)
-parser.add_argument('--log_folder', default=None, type=str)
+run_id = datetime.now().strftime("%Y%m%d-%H%M")
+run_id = datetime.now().strftime("%Y%m%d-%H%M")
+model_save_path = os.path.join(args.work_dir, args.task_name + "-" + run_id)
+device = torch.device(args.device)
 
-parser.add_argument('--model_folder', default=None, type=str)
-parser.add_argument('--batch_size', default=None, type=str)
-parser.add_argument('--cfg', default=None, type=str)
+os.makedirs(model_save_path, exist_ok=True)
+sam_model = sam_model_registry[args.model_type](checkpoint=args.checkpoint)
+model = PneuSam(
+    image_encoder=sam_model.image_encoder,
+    mask_decoder=sam_model.mask_decoder,
+    prompt_encoder=sam_model.prompt_encoder,
+).to(device)
+model.train()
+print(
+    "Number of total parameters: ",
+    sum(p.numel() for p in model.parameters()),
+)  # 93735472
+print(
+    "Number of trainable parameters: ",
+    sum(p.numel() for p in model.parameters() if p.requires_grad),
+)  # 93729252
+print("args.dir_dataset: ", args.dir_dataset)
+modelParams = list(model.image_encoder.parameters()) + list(model.mask_decoder.parameters())
+optimizer = torch.optim.AdamW(
+        modelParams, lr=args.lr, weight_decay=args.weight_decay
+    )
+print(
+        "Number of image encoder and mask decoder parameters: ",
+        sum(p.numel() for p in modelParams if p.requires_grad),
+    )
+seg_loss = monai.losses.DiceLoss(sigmoid=True, squared_pred=True, reduction="mean")
+    # cross entropy loss
+ce_loss = nn.BCEWithLogitsLoss(reduction="mean")
+num_epochs = args.num_epochs
+iter_num = 0
+losses = []
+best_loss = 1e10
 
+train_dataset = PneumothoraxDataset(args.dir_dataset)
+sampler = PneumoSampler(args.dir_dataset)
+print("Number of training samples: ", len(train_dataset))
+train_dataloader = DataLoader(
+    train_dataset,
+    batch_size=args.batch_size,
+    num_workers=args.num_workers,
+    sampler=sampler,
+)
+start_epoch = 0
+print("num_epochs: ", num_epochs)
+for epoch in range(start_epoch, num_epochs):
+    epoch_loss = 0
+    for step, (image, gt2D, boxes, _) in enumerate(tqdm(train_dataloader)):
+        optimizer.zero_grad()
+        boxes_np = boxes.detach().cpu().numpy()
+        image, gt2D = image.to(device), gt2D.to(device)
+        pred = model(image, boxes_np)
+        loss = seg_loss(pred, gt2D) + ce_loss(pred, gt2D.float())
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+        epoch_loss += loss.item()
+        iter_num += 1
 
-# def show_mask(mask, ax, random_color=False):
-#     if random_color:
-#         color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
-#     else:
-#         color = np.array([251 / 255, 252 / 255, 30 / 255, 0.6])
-#     h, w = mask.shape[-2:]
-#     mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
-#     ax.imshow(mask_image)
+    epoch_loss /= step
+    losses.append(epoch_loss)
+    checkpoint = {
+            "model": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "epoch": epoch,
+        }
+    torch.save(checkpoint, os.path.join(model_save_path, "sam_model_latest.pth"))
+    if epoch_loss < best_loss:
+        best_loss = epoch_loss
+        checkpoint = {
+            "model": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "epoch": epoch,
+        }
+        torch.save(checkpoint, os.path.join(model_save_path, "sam_model_best.pth"))
 
-
-# def show_box(box, ax):
-#     x0, y0 = box[0], box[1]
-#     w, h = box[2] - box[0], box[3] - box[1]
-#     ax.add_patch(
-#         plt.Rectangle((x0, y0), w, h, edgecolor="blue",
-#                       facecolor=(0, 0, 0, 0), lw=2)
-#     )
-
-
-if __name__ == '__main__':
-    args = parser.parse_args()
-    task_name = args.task_name
-    if args.cfg is not None:
-        config = OmegaConf.load(args.cfg)
-    else:
-        assert task_name in supported_tasks, "Please input the supported task name."
-        config = OmegaConf.load(
-            "./config/{task_name}.yaml".format(task_name=args.task_name))
-
-    train_cfg = config.train
-    sampler_cfg = train_cfg.get('sampler', None)
-    val_cfg = config.val
-
-    if args.dataset_dir:
-        train_cfg.dataset.params.dataset_dir = args.dataset_dir
-        val_cfg.dataset.params.dataset_dir = args.dataset_dir
-        if sampler_cfg:
-            sampler_cfg.params.dataset_dir = args.dataset_dir
-
-    if args.ckpt_path:
-        train_cfg.model.params.ckpt_path = args.ckpt_path
-
-    if args.tensorboard_folder:
-        train_cfg.tensorboard_folder = args.tensorboard_folder
-
-    if args.log_folder:
-        train_cfg.log_folder = args.log_folder
-
-    if args.model_folder:
-        train_cfg.model_folder = args.model_folder
-
-    if args.batch_size:
-        train_cfg.bs = int(args.batch_size)
-        val_cfg.bs = int(args.batch_size)
-
-    test_cfg = config.test
-
-    train_dataset = get_dataset(train_cfg.dataset)
-    # tr_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True)
-    # for step, (image, gt, bboxes, names_temp) in enumerate(tr_dataloader):
-    #     print(image.shape, gt.shape, bboxes.shape)
-    #     # show the example
-    #     _, axs = plt.subplots(1, 2, figsize=(25, 25))
-    #     idx = random.randint(0, 7)
-    #     axs[0].imshow(image[idx].cpu().permute(1, 2, 0).numpy())
-    #     show_mask(gt[idx].cpu().numpy(), axs[0])
-    #     show_box(bboxes[idx].numpy(), axs[0])
-    #     axs[0].axis("off")
-    #     # set title
-    #     axs[0].set_title(names_temp[idx])
-    #     idx = random.randint(0, 7)
-    #     axs[1].imshow(image[idx].cpu().permute(1, 2, 0).numpy())
-    #     show_mask(gt[idx].cpu().numpy(), axs[1])
-    #     show_box(bboxes[idx].numpy(), axs[1])
-    #     axs[1].axis("off")
-    #     # set title
-    #     axs[1].set_title(names_temp[idx])
-    #     # plt.show()
-    #     plt.subplots_adjust(wspace=0.01, hspace=0)
-    #     plt.savefig("./test.png", bbox_inches="tight", dpi=300)
-    #     plt.close()
-    #     break
-    if sampler_cfg:
-        sampler = get_sampler(sampler_cfg)
-
-    # train_sampler = PneumoSampler(folds_distr_path, fold_id, non_empty_mask_prob)
-
-    if sampler_cfg:
-        train_loader = DataLoader(train_dataset, batch_size=4, shuffle=False, num_workers=train_cfg.num_workers,
-                                  drop_last=train_cfg.drop_last, sampler=sampler)
-    else:
-        train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True, num_workers=train_cfg.num_workers,
-                                  drop_last=train_cfg.drop_last)
-    val_dataset = get_dataset(val_cfg.dataset)
-    val_loader = DataLoader(val_dataset, batch_size=4, shuffle=False, num_workers=val_cfg.num_workers,
-                            drop_last=val_cfg.drop_last)
-    losses = get_losses(losses=train_cfg.losses)
-    # according the model name to get the adapted model
-    model = get_model(model_name=train_cfg.model.sam_name,
-                      **train_cfg.model.params)
-
-    total_params = sum(p.numel() for p in model.parameters())
-    print(f'{total_params:,} total parameters.')
-    total_trainable_params = sum(
-        p.numel() for p in model.parameters() if p.requires_grad)
-    print(f'{total_trainable_params:,} training parameters.')
-    img_mask_encdec_params = list(model.mask_decoder.parameters())+list(
-        model.image_encoder.parameters())
-    optimizer = get_optimizer(opt_name=train_cfg.opt_name, params=img_mask_encdec_params,
-                              lr=train_cfg.opt_params.lr_default, weight_decay=train_cfg.opt_params.wd_default)
-    scheduler = get_scheduler(
-        optimizer=optimizer, lr_scheduler=train_cfg.scheduler_name)
-    mask_binarizer_cfg = config.mask_binarizer
-    mask_binarizer_fn = get_mask_binarizes(mask_binarizer_cfg)
-    runner = get_runner(train_cfg.runner_name)(
-        model, optimizer, losses, train_loader, val_loader, scheduler, mask_binarizer_fn)
-    # train_step
-    runner.train(train_cfg)
-    if test_cfg.need_test:
-        runner.test(test_cfg)
+plt.plot(losses)
+plt.title("Dice + Cross Entropy Loss")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.savefig(os.path.join(model_save_path, args.task_name + "train_loss.png"))
+plt.close()

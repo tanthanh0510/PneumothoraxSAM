@@ -108,8 +108,7 @@ class SamAutomaticMaskGenerator:
         elif point_grids is not None:
             self.point_grids = point_grids
         else:
-            raise ValueError(
-                "Can't have both points_per_side and point_grid be None.")
+            raise ValueError("Can't have both points_per_side and point_grid be None.")
 
         assert output_mode in [
             "binary_mask",
@@ -178,8 +177,7 @@ class SamAutomaticMaskGenerator:
                 coco_encode_rle(rle) for rle in mask_data["rles"]
             ]
         elif self.output_mode == "binary_mask":
-            mask_data["segmentations"] = [
-                rle_to_mask(rle) for rle in mask_data["rles"]]
+            mask_data["segmentations"] = [rle_to_mask(rle) for rle in mask_data["rles"]]
         else:
             mask_data["segmentations"] = mask_data["rles"]
 
@@ -208,8 +206,7 @@ class SamAutomaticMaskGenerator:
         # Iterate over image crops
         data = MaskData()
         for crop_box, layer_idx in zip(crop_boxes, layer_idxs):
-            crop_data = self._process_crop(
-                image, crop_box, layer_idx, orig_size)
+            crop_data = self._process_crop(image, crop_box, layer_idx, orig_size)
             data.cat(crop_data)
 
         # Remove duplicate masks between crops
@@ -267,8 +264,7 @@ class SamAutomaticMaskGenerator:
         # Return to the original image frame
         data["boxes"] = uncrop_boxes_xyxy(data["boxes"], crop_box)
         data["points"] = uncrop_points(data["points"], crop_box)
-        data["crop_boxes"] = torch.tensor(
-            [crop_box for _ in range(len(data["rles"]))])
+        data["crop_boxes"] = torch.tensor([crop_box for _ in range(len(data["rles"]))])
 
         return data
 
@@ -282,10 +278,8 @@ class SamAutomaticMaskGenerator:
         orig_h, orig_w = orig_size
 
         # Run model on this batch
-        transformed_points = self.predictor.transform.apply_coords(
-            points, im_size)
-        in_points = torch.as_tensor(
-            transformed_points, device=self.predictor.device)
+        transformed_points = self.predictor.transform.apply_coords(points, im_size)
+        in_points = torch.as_tensor(transformed_points, device=self.predictor.device)
         in_labels = torch.ones(
             in_points.shape[0], dtype=torch.int, device=in_points.device
         )
@@ -360,8 +354,7 @@ class SamAutomaticMaskGenerator:
 
             mask, changed = remove_small_regions(mask, min_area, mode="holes")
             unchanged = not changed
-            mask, changed = remove_small_regions(
-                mask, min_area, mode="islands")
+            mask, changed = remove_small_regions(mask, min_area, mode="islands")
             unchanged = unchanged and not changed
 
             new_masks.append(torch.as_tensor(mask).unsqueeze(0))
@@ -384,8 +377,7 @@ class SamAutomaticMaskGenerator:
             if scores[i_mask] == 0.0:
                 mask_torch = masks[i_mask].unsqueeze(0)
                 mask_data["rles"][i_mask] = mask_to_rle_pytorch(mask_torch)[0]
-                # update res directly
-                mask_data["boxes"][i_mask] = boxes[i_mask]
+                mask_data["boxes"][i_mask] = boxes[i_mask]  # update res directly
         mask_data.filter(keep_by_nms)
 
         return mask_data

@@ -47,8 +47,7 @@ class Sam(nn.Module):
         self.register_buffer(
             "pixel_mean", torch.Tensor(pixel_mean).view(-1, 1, 1), False
         )
-        self.register_buffer("pixel_std", torch.Tensor(
-            pixel_std).view(-1, 1, 1), False)
+        self.register_buffer("pixel_std", torch.Tensor(pixel_std).view(-1, 1, 1), False)
 
     @property
     def device(self) -> Any:
@@ -106,8 +105,7 @@ class Sam(nn.Module):
         outputs = []
         for image_record, curr_embedding in zip(batched_input, image_embeddings):
             if "point_coords" in image_record:
-                points = (image_record["point_coords"],
-                          image_record["point_labels"])
+                points = (image_record["point_coords"], image_record["point_labels"])
             else:
                 points = None
             sparse_embeddings, dense_embeddings = self.prompt_encoder(

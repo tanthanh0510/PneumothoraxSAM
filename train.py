@@ -150,7 +150,7 @@ def train(model, train_dataloader, seg_loss, ce_loss, optimizer, epoch, model_sa
     }
     torch.save(checkpoint, os.path.join(
         model_save_path, "sam_model_latest.pth"))
-    print(f"epoch_loss at {epoch}: {epoch_loss}, bestLoss: {bestLoss}")
+
     if epoch_loss < bestLoss:
         bestLoss = epoch_loss
         checkpoint = {
@@ -163,6 +163,7 @@ def train(model, train_dataloader, seg_loss, ce_loss, optimizer, epoch, model_sa
         torch.save(checkpoint, os.path.join(
             model_save_path, "sam_model_train_best.pth"))
 
+    print(f"epoch_loss at {epoch}: {epoch_loss}, bestLoss: {bestLoss}")
     return epoch_loss, bestLoss
 
 
@@ -209,10 +210,8 @@ def val(model, val_dataloader, seg_loss, ce_loss, optimizer, epoch, model_save_p
                          curr_metric=curr_metric.item())
 
     best_threshold = max(metrics, key=metrics.get)
-    print(f'Score: {metrics[best_threshold]:.5} at threshold {best_threshold}')
     # write metrics to file
     valLoss /= step
-    print(f"valLoss at epoch {epoch}: {valLoss}, bestValLoss: {bestValLoss}")
     if metrics[best_threshold] > bestScore:
         bestScore = metrics[best_threshold]
         checkpoint = {
@@ -239,6 +238,8 @@ def val(model, val_dataloader, seg_loss, ce_loss, optimizer, epoch, model_save_p
             model_save_path, "sam_model_val_best.pth"))
     process_summary(os.path.join(model_save_path,
                     "summary.csv"), metrics, epoch)
+    print(f"valLoss at epoch {epoch}: {valLoss}, bestValLoss: {bestValLoss}")
+    print(f'Score: {metrics[best_threshold]:.5} at threshold {best_threshold}')
     model.train()
 
     return valLoss, bestValLoss, bestScore

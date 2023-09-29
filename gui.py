@@ -15,15 +15,10 @@ from PyQt5.QtGui import (
 from PyQt5.QtWidgets import (
     QFileDialog,
     QApplication,
-    QGraphicsEllipseItem,
-    QGraphicsItem,
-    QGraphicsRectItem,
     QGraphicsScene,
     QGraphicsView,
-    QGraphicsPixmapItem,
     QHBoxLayout,
     QPushButton,
-    QSlider,
     QVBoxLayout,
     QWidget,
     QShortcut,
@@ -89,7 +84,7 @@ tic = time.perf_counter()
 medsam_model = sam_model_registry["vit_b"](
     checkpoint=MedSAM_CKPT_PATH).to(device)
 checkpoint = torch.load(
-    'experiment/sam_model_val_best.pth', map_location=device)['model']
+    'experiment/sam_model_val_best.pth', map_location=device)
 
 medsam_model.load_state_dict(checkpoint['model'])
 print("Model loaded at epoch", checkpoint['epoch'])

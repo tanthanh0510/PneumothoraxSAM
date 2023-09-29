@@ -187,7 +187,7 @@ def process_summary(summary_file, metrics, epoch):
         summary.to_csv(summary_file, index=False)
 
 
-def val(model, val_dataloader, seg_loss, ce_loss, optimizer, epoch, model_save_path, device, bestValLoss, maskBinarizer):
+def val(model, val_dataloader, seg_loss, ce_loss, optimizer, epoch, model_save_path, device, bestValLoss, maskBinarizer, bestScore):
     model.eval()
     valLoss = 0
     metrics = DefaultDict(float)
@@ -213,6 +213,19 @@ def val(model, val_dataloader, seg_loss, ce_loss, optimizer, epoch, model_save_p
     # write metrics to file
     valLoss /= step
     print(f"valLoss at epoch {epoch}: {valLoss}, bestValLoss: {bestValLoss}")
+    if metrics[best_threshold] > bestScore:
+        bestScore = metrics[best_threshold]
+        checkpoint = {
+            "model": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "epoch": epoch,
+            "bestScore": bestScore,
+            "lossVal": bestValLoss,
+            "best_threshold": best_threshold
+        }
+        torch.save(checkpoint, os.path.join(
+            model_save_path, "sam_model_val_best_score.pth"))
+
     if valLoss < bestValLoss:
         bestValLoss = valLoss
         checkpoint = {
@@ -228,7 +241,7 @@ def val(model, val_dataloader, seg_loss, ce_loss, optimizer, epoch, model_save_p
                     "summary.csv"), metrics, epoch)
     model.train()
 
-    return valLoss, bestValLoss
+    return valLoss, bestValLoss, bestScore
 
 
 def test(args, maskBinarizer):
@@ -266,6 +279,7 @@ def test(args, maskBinarizer):
 
 
 def main(args, maskBinarizer):
+    bestScore = 0
     run_id = datetime.now().strftime("%Y%m%d-%H%M")
     model_save_path = os.path.join(
         args.work_dir, args.task_name + "-" + run_id)
@@ -290,8 +304,8 @@ def main(args, maskBinarizer):
                                       ce_loss, optimizer, epoch, model_save_path, device, best_loss)
         losses.append(epoch_loss)
         if epoch % args.valEpoch == 0:
-            val_loss, best_val_loss = val(model, val_dataloader, seg_loss,
-                                          ce_loss, optimizer, epoch, model_save_path, device, best_val_loss, maskBinarizer)
+            val_loss, best_val_loss, bestScore = val(model, val_dataloader, seg_loss,
+                                                     ce_loss, optimizer, epoch, model_save_path, device, best_val_loss, maskBinarizer, bestScore)
             val_losses.append(val_loss)
 
     plt.plot(losses)

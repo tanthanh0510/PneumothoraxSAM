@@ -28,13 +28,14 @@ class PneumothoraxDataset(VisionDataset):
         |   |   ├── val.csv
     """
 
-    def __init__(self, dataset_dir, usePromt,
+    def __init__(self, dataset_dir, usePromt, useRandom=1,
                  image_set='train',
                  data_prefix: dict = dict(img_path='train', ann_path='mask'),
                  return_dict=False):
         super(PneumothoraxDataset, self).__init__(root=dataset_dir)
         self.class_names = ['pneumothorax']
         self.usePromt = usePromt
+        self.useRandom = useRandom
         self.dataset = pd.read_csv(
             os.path.join(dataset_dir, image_set + '.csv'))
         # self.dataset = self.dataset[self.dataset['existLabel'] == 1]
@@ -77,8 +78,16 @@ class PneumothoraxDataset(VisionDataset):
                 y_max = min(H, y_max + random.randint(0, 20))
                 bboxes = np.array([x_min, y_min, x_max, y_max])
             else:
-                bboxes = np.array([0, 0, W, H])
-        print("bboxes", bboxes)
+                if self.useRandom == 0:
+                    x_min = random.randint(0, W - 20)
+                    y_min = random.randint(0, H - 20)
+                    random_w = random.randint(20, W - x_min)
+                    random_h = random.randint(20, H - y_min)
+                    x_max = x_min + random_w
+                    y_max = y_min + random_h
+                    bboxes = np.array([x_min, y_min, x_max, y_max])
+                else:
+                    bboxes = np.array([0, 0, W, H])
         return (
             torch.tensor(img).float(),
             torch.tensor(ann[None, :, :]).long(),

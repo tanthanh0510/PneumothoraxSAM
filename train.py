@@ -180,7 +180,7 @@ def process_summary(summary_file, metrics, epoch):
     print(
         f'Epoch {epoch + 1}\tScore: {metrics[best_threshold]:.5} at params: {best_threshold}')
 
-    if not summary_file.is_file():
+    if not os.path.exists(summary_file):
         epoch_summary.to_csv(summary_file, index=False)
     else:
         summary = pd.read_csv(summary_file)

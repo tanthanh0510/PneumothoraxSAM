@@ -184,7 +184,7 @@ def process_summary(summary_file, metrics, epoch):
         epoch_summary.to_csv(summary_file, index=False)
     else:
         summary = pd.read_csv(summary_file)
-        summary = summary.append(epoch_summary).reset_index(drop=True)
+        summary = pd.concat([summary, epoch_summary]).reset_index(drop=True)
         summary.to_csv(summary_file, index=False)
 
 

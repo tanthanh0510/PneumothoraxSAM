@@ -28,12 +28,13 @@ class PneumothoraxDataset(VisionDataset):
         |   |   ├── val.csv
     """
 
-    def __init__(self, dataset_dir,
+    def __init__(self, dataset_dir, usePromt,
                  image_set='train',
                  data_prefix: dict = dict(img_path='train', ann_path='mask'),
                  return_dict=False):
         super(PneumothoraxDataset, self).__init__(root=dataset_dir)
         self.class_names = ['pneumothorax']
+        self.usePromt = usePromt
         self.dataset = pd.read_csv(
             os.path.join(dataset_dir, image_set + '.csv'))
         # self.dataset = self.dataset[self.dataset['existLabel'] == 1]
@@ -63,18 +64,21 @@ class PneumothoraxDataset(VisionDataset):
         ann = io.imread(ann_file_name)
         ann = ann/255
         H, W = ann.shape
-        if ann.max() == 1:
-            y_indices, x_indices = np.where(ann > 0)
-            x_min, x_max = np.min(x_indices), np.max(x_indices)
-            y_min, y_max = np.min(y_indices), np.max(y_indices)
-            x_min = max(0, x_min - random.randint(0, 20))
-            x_max = min(W, x_max + random.randint(0, 20))
-            y_min = max(0, y_min - random.randint(0, 20))
-            y_max = min(H, y_max + random.randint(0, 20))
-            bboxes = np.array([x_min, y_min, x_max, y_max])
-        else:
+        if self.usePromt != 0:
             bboxes = np.array([0, 0, W, H])
-
+        else:
+            if ann.max() == 1:
+                y_indices, x_indices = np.where(ann > 0)
+                x_min, x_max = np.min(x_indices), np.max(x_indices)
+                y_min, y_max = np.min(y_indices), np.max(y_indices)
+                x_min = max(0, x_min - random.randint(0, 20))
+                x_max = min(W, x_max + random.randint(0, 20))
+                y_min = max(0, y_min - random.randint(0, 20))
+                y_max = min(H, y_max + random.randint(0, 20))
+                bboxes = np.array([x_min, y_min, x_max, y_max])
+            else:
+                bboxes = np.array([0, 0, W, H])
+        print("bboxes", bboxes)
         return (
             torch.tensor(img).float(),
             torch.tensor(ann[None, :, :]).long(),

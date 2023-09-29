@@ -35,6 +35,7 @@ def getArgs():
         help="dir dataset",
     )
     parser.add_argument("-mode", type=str, default="train")
+    parser.add_argument("-usePromt", type=int, default=0)
     parser.add_argument("-valEpoch", type=int, default=10)
     parser.add_argument("-task_name", type=str, default="SAM-ViT-B")
     parser.add_argument("-model_type", type=str, default="vit_b")
@@ -105,8 +106,9 @@ def getModel(args):
 
 
 def getDataLoaders(args):
-    train_dataset = PneumothoraxDataset(args.dir_dataset)
-    val_dataset = PneumothoraxDataset(args.dir_dataset, image_set="val")
+    train_dataset = PneumothoraxDataset(args.dir_dataset, args.usePromt)
+    val_dataset = PneumothoraxDataset(
+        args.dir_dataset, args.usePromt, image_set="val")
     sampler = PneumoSampler(args.dir_dataset)
     print("Number of training samples: ", len(train_dataset))
     print("Number of validation samples: ", len(val_dataset))
@@ -249,7 +251,8 @@ def test(args, maskBinarizer):
     model, _, _, _, _ = getModel(args)
     device = torch.device(args.device)
     model.eval()
-    test_dataset = PneumothoraxDataset(args.dir_dataset, image_set="val")
+    test_dataset = PneumothoraxDataset(
+        args.dir_dataset, args.usePromt, image_set="val")
     test_dataloader = DataLoader(
         test_dataset,
         batch_size=args.batch_size,

@@ -1,8 +1,12 @@
 import os
 import argparse
+import matplotlib.pyplot as plt
+
+from typing import DefaultDict
 from tqdm import tqdm
 from datetime import datetime
-import matplotlib.pyplot as plt
+
+import pandas as pd
 
 import monai
 import torch
@@ -15,6 +19,8 @@ from segment_anything.model import PneuSam
 from datasets.semantic_seg import PneumothoraxDataset, PneumoSampler
 
 from losses import dice_metric
+
+from utils.mask_binarizers import TripletMaskBinarization
 # set seeds
 torch.manual_seed(49)
 torch.cuda.empty_cache()
@@ -160,9 +166,31 @@ def train(model, train_dataloader, seg_loss, ce_loss, optimizer, epoch, model_sa
     return epoch_loss, bestLoss
 
 
-def val(model, val_dataloader, seg_loss, ce_loss, optimizer, epoch, model_save_path, device, bestValLoss):
+def process_summary(summary_file, metrics, epoch):
+    best_threshold = max(metrics, key=metrics.get)
+
+    epoch_summary = pd.DataFrame.from_dict([metrics])
+    epoch_summary['epoch'] = epoch
+    epoch_summary['best_metric'] = metrics[best_threshold]
+    epoch_summary = epoch_summary[[
+        'epoch', 'best_metric'] + list(metrics.keys())]
+    epoch_summary.columns = list(map(str, epoch_summary.columns))
+
+    print(
+        f'Epoch {epoch + 1}\tScore: {metrics[best_threshold]:.5} at params: {best_threshold}')
+
+    if not summary_file.is_file():
+        epoch_summary.to_csv(summary_file, index=False)
+    else:
+        summary = pd.read_csv(summary_file)
+        summary = summary.append(epoch_summary).reset_index(drop=True)
+        summary.to_csv(summary_file, index=False)
+
+
+def val(model, val_dataloader, seg_loss, ce_loss, optimizer, epoch, model_save_path, device, bestValLoss, maskBinarizer):
     model.eval()
     valLoss = 0
+    metrics = DefaultDict(float)
     pbar = tqdm(val_dataloader, desc=f"Val on epoch {epoch}")
     for step, (image, gt2D, boxes, _) in enumerate(pbar):
         boxes_np = boxes.detach().cpu().numpy()
@@ -170,8 +198,19 @@ def val(model, val_dataloader, seg_loss, ce_loss, optimizer, epoch, model_save_p
         pred = model(image, boxes_np)
         loss = seg_loss(pred, gt2D) + ce_loss(pred, gt2D.float())
         valLoss += loss.item()
-        pbar.set_postfix(loss=loss.item())
+        pred = torch.sigmoid(pred)
+        mask_generator = maskBinarizer.transform(pred)
+        for curr_threshold, curr_mask in zip(maskBinarizer.thresholds, mask_generator):
+            curr_metric = dice_metric(curr_mask, gt2D)
+            curr_threshold = tuple(curr_threshold)
+            metrics[curr_threshold] = (
+                metrics[curr_threshold] * step + curr_metric) / (step + 1)
+        pbar.set_postfix(loss=loss.item(), curr_threshold=curr_threshold,
+                         curr_metric=curr_metric.item())
 
+    best_threshold = max(metrics, key=metrics.get)
+    print(f'Score: {metrics[best_threshold]:.5} at threshold {best_threshold}')
+    # write metrics to file
     valLoss /= step
     print(f"valLoss at epoch {epoch}: {valLoss}, bestValLoss: {bestValLoss}")
     if valLoss < bestValLoss:
@@ -185,12 +224,14 @@ def val(model, val_dataloader, seg_loss, ce_loss, optimizer, epoch, model_save_p
         }
         torch.save(checkpoint, os.path.join(
             model_save_path, "sam_model_val_best.pth"))
+    process_summary(os.path.join(model_save_path,
+                    "summary.csv"), metrics, epoch)
     model.train()
 
     return valLoss, bestValLoss
 
 
-def test(args):
+def test(args, maskBinarizer):
     model, _, _, _, _ = getModel(args)
     device = torch.device(args.device)
     model.eval()
@@ -203,21 +244,28 @@ def test(args):
     )
     pbar = tqdm(test_dataloader, desc=f"Test")
     totalScore = 0
+    metrics = DefaultDict(float)
     for step, (image, gt2D, boxes, _) in enumerate(pbar):
         boxes_np = boxes.detach().cpu().numpy()
         image, gt2D = image.to(device), gt2D.to(device)
         pred = model(image, boxes_np)
         pred = torch.sigmoid(pred)
-        score = dice_metric(pred, gt2D)
-        totalScore += score.item()
-        pbar.set_postfix(score=score.item())
+        mask_generator = maskBinarizer.transform(pred)
+        for curr_threshold, curr_mask in zip(maskBinarizer.thresholds, mask_generator):
+            curr_metric = dice_metric(curr_mask, gt2D)
+            curr_threshold = tuple(curr_threshold)
+            metrics[curr_threshold] = (
+                metrics[curr_threshold] * step + curr_metric) / (step + 1)
+            pbar.set_postfix(curr_threshold=curr_threshold,
+                             curr_metric=curr_metric.item())
 
-    totalScore /= step
-    print("totalScore: ", totalScore)
+    best_threshold = max(metrics, key=metrics.get)
+    print(f'Score: {metrics[best_threshold]:.5} at threshold {best_threshold}')
+
     return totalScore
 
 
-def main(args):
+def main(args, maskBinarizer):
     run_id = datetime.now().strftime("%Y%m%d-%H%M")
     model_save_path = os.path.join(
         args.work_dir, args.task_name + "-" + run_id)
@@ -243,7 +291,7 @@ def main(args):
         losses.append(epoch_loss)
         if epoch % args.valEpoch == 0:
             val_loss, best_val_loss = val(model, val_dataloader, seg_loss,
-                                          ce_loss, optimizer, epoch, model_save_path, device, best_val_loss)
+                                          ce_loss, optimizer, epoch, model_save_path, device, best_val_loss, maskBinarizer)
             val_losses.append(val_loss)
 
     plt.plot(losses)
@@ -264,9 +312,20 @@ def main(args):
 
 if __name__ == "__main__":
     args = getArgs()
+    triplets = [
+        [0.75, 1000, 0.3],
+        [0.75, 1000, 0.4],
+        [0.75, 2000, 0.3],
+        [0.75, 2000, 0.4],
+        [0.6, 2000, 0.3],
+        [0.6, 2000, 0.4],
+        [0.6, 3000, 0.3],
+        [0.6, 3000, 0.4],
+    ]
+    maskBinarizer = TripletMaskBinarization(triplets=triplets)
     if args.mode == "train":
-        main(args)
+        main(args, maskBinarizer)
     elif args.mode == "test":
-        test(args)
+        test(args, maskBinarizer)
     else:
         print("Invalid mode")

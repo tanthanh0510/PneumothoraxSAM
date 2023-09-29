@@ -39,7 +39,7 @@ def getArgs():
     parser.add_argument("-task_name", type=str, default="SAM-ViT-B")
     parser.add_argument("-model_type", type=str, default="vit_b")
     parser.add_argument("-resume", type=str,
-                        default="experiment/sam_model_val_best.pth")
+                        default=None)
     parser.add_argument(
         "-checkpoint", type=str, default="sam_ckpt/sam_vit_b_01ec64.pth"
     )

@@ -145,7 +145,7 @@ def train(model, train_dataloader, seg_loss, ce_loss, optimizer, epoch, model_sa
         "model": model.state_dict(),
         "optimizer": optimizer.state_dict(),
         "epoch": epoch,
-        "lossTrain": epoch_loss.item(),
+        "lossTrain": epoch_loss,
         "lossVal": 1e10,
     }
     torch.save(checkpoint, os.path.join(
@@ -157,7 +157,7 @@ def train(model, train_dataloader, seg_loss, ce_loss, optimizer, epoch, model_sa
             "model": model.state_dict(),
             "optimizer": optimizer.state_dict(),
             "epoch": epoch,
-            "lossTrain": bestLoss.item(),
+            "lossTrain": bestLoss,
             "lossVal": 1e10,
         }
         torch.save(checkpoint, os.path.join(
@@ -220,7 +220,7 @@ def val(model, val_dataloader, seg_loss, ce_loss, optimizer, epoch, model_save_p
             "optimizer": optimizer.state_dict(),
             "epoch": epoch,
             "lossTrain": 1e10,
-            "lossVal": bestValLoss.item(),
+            "lossVal": bestValLoss,
         }
         torch.save(checkpoint, os.path.join(
             model_save_path, "sam_model_val_best.pth"))

@@ -1,1 +1,0 @@
-python train.py --task_name semantic_seg --ckpt_path /home/thanhtran/workdir/project/finetune-anything/sam_ckpt/sam_vit_b_01ec64.pth --batch_size 4 --dataset_dir /home/thanhtran/workdir/project/finetune-anything/input/dataset1024

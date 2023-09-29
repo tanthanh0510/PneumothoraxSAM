@@ -1,3 +1,6 @@
+import torch
+
+
 def soft_dice_loss(outputs, targets, per_image=False, per_channel=False):
     batch_size, n_channels = outputs.size(0), outputs.size(1)
 

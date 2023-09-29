@@ -14,101 +14,112 @@ from segment_anything import sam_model_registry
 from segment_anything.model import PneuSam
 from datasets.semantic_seg import PneumothoraxDataset, PneumoSampler
 
+from losses import dice_metric
 # set seeds
 torch.manual_seed(49)
 torch.cuda.empty_cache()
 
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "-dir_dataset",
-    type=str,
-    default="input/dataset1024",
-    help="dir dataset",
-)
-parser.add_argument("-valEpoch", type=int, default=10)
-parser.add_argument("-task_name", type=str, default="SAM-ViT-B")
-parser.add_argument("-model_type", type=str, default="vit_b")
-parser.add_argument(
-    "-checkpoint", type=str, default="sam_ckpt/sam_vit_b_01ec64.pth"
-)
-# parser.add_argument('-device', type=str, default='cuda:0')
-parser.add_argument("-pretrain_model_path", type=str, default="")
-parser.add_argument("-work_dir", type=str, default="./experiment")
-# train
-parser.add_argument("-num_epochs", type=int, default=500)
-parser.add_argument("-batch_size", type=int, default=2)
-parser.add_argument("-num_workers", type=int, default=2)
-# Optimizer parameters
-parser.add_argument(
-    "-weight_decay", type=float, default=0.01, help="weight decay (default: 0.01)"
-)
-parser.add_argument(
-    "-lr", type=float, default=0.0001, metavar="LR", help="learning rate (absolute lr)"
-)
-parser.add_argument("-use_amp", action="store_true", default=False, help="use amp")
-parser.add_argument("--device", type=str, default="cuda:0")
-args = parser.parse_args()
 
-run_id = datetime.now().strftime("%Y%m%d-%H%M")
-run_id = datetime.now().strftime("%Y%m%d-%H%M")
-model_save_path = os.path.join(args.work_dir, args.task_name + "-" + run_id)
-device = torch.device(args.device)
+def getArgs():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-dir_dataset",
+        type=str,
+        default="input/dataset1024",
+        help="dir dataset",
+    )
+    parser.add_argument("-mode", type=str, default="train")
+    parser.add_argument("-valEpoch", type=int, default=10)
+    parser.add_argument("-task_name", type=str, default="SAM-ViT-B")
+    parser.add_argument("-model_type", type=str, default="vit_b")
+    parser.add_argument("-resume", type=str,
+                        default="experiment/sam_model_val_best.pth")
+    parser.add_argument(
+        "-checkpoint", type=str, default="sam_ckpt/sam_vit_b_01ec64.pth"
+    )
+    parser.add_argument("-pretrain_model_path", type=str, default="")
+    parser.add_argument("-work_dir", type=str, default="./experiment")
+    parser.add_argument("-num_epochs", type=int, default=500)
+    parser.add_argument("-batch_size", type=int, default=2)
+    parser.add_argument("-num_workers", type=int, default=2)
+    parser.add_argument(
+        "-weight_decay", type=float, default=0.01, help="weight decay (default: 0.01)"
+    )
+    parser.add_argument(
+        "-lr", type=float, default=0.0001, metavar="LR", help="learning rate (absolute lr)"
+    )
+    parser.add_argument("-use_amp", action="store_true",
+                        default=False, help="use amp")
+    parser.add_argument("--device", type=str, default="cuda:0")
+    args = parser.parse_args()
+    return args
 
-os.makedirs(model_save_path, exist_ok=True)
-sam_model = sam_model_registry[args.model_type](checkpoint=args.checkpoint)
-model = PneuSam(
-    image_encoder=sam_model.image_encoder,
-    mask_decoder=sam_model.mask_decoder,
-    prompt_encoder=sam_model.prompt_encoder,
-).to(device)
-model.train()
-print(
-    "Number of total parameters: ",
-    sum(p.numel() for p in model.parameters()),
-)  # 93735472
-print(
-    "Number of trainable parameters: ",
-    sum(p.numel() for p in model.parameters() if p.requires_grad),
-)  # 93729252
-print("args.dir_dataset: ", args.dir_dataset)
-modelParams = list(model.image_encoder.parameters()) + list(model.mask_decoder.parameters())
-optimizer = torch.optim.AdamW(
+
+def getModel(args):
+    bestLossTrain, bestLossVal = 1e10, 1e10
+    sam_model = sam_model_registry[args.model_type](checkpoint=args.checkpoint)
+    model = PneuSam(
+        image_encoder=sam_model.image_encoder,
+        mask_decoder=sam_model.mask_decoder,
+        prompt_encoder=sam_model.prompt_encoder,
+    ).to(args.device)
+    model.train()
+    print(
+        "Number of total parameters: ",
+        sum(p.numel() for p in model.parameters()),
+    )
+    print(
+        "Number of trainable parameters: ",
+        sum(p.numel() for p in model.parameters() if p.requires_grad),
+    )
+    modelParams = list(model.image_encoder.parameters()) + \
+        list(model.mask_decoder.parameters())
+    optimizer = torch.optim.AdamW(
         modelParams, lr=args.lr, weight_decay=args.weight_decay
     )
-print(
+    print(
         "Number of image encoder and mask decoder parameters: ",
         sum(p.numel() for p in modelParams if p.requires_grad),
     )
-seg_loss = monai.losses.DiceLoss(sigmoid=True, squared_pred=True, reduction="mean")
-    # cross entropy loss
-ce_loss = nn.BCEWithLogitsLoss(reduction="mean")
-num_epochs = args.num_epochs
-iter_num = 0
-losses = []
-val_losses = []
-best_loss = 1e10
-best_val_loss = 1e10
-train_dataset = PneumothoraxDataset(args.dir_dataset)
-val_dataset = PneumothoraxDataset(args.dir_dataset, image_set="val")
-sampler = PneumoSampler(args.dir_dataset)
-print("Number of training samples: ", len(train_dataset))
-print("Number of validation samples: ", len(val_dataset))
-train_dataloader = DataLoader(
-    train_dataset,
-    batch_size=args.batch_size,
-    num_workers=args.num_workers,
-    sampler=sampler,
-)
-val_dataloader = DataLoader(
-    val_dataset,
-    batch_size=args.batch_size,
-    num_workers=args.num_workers,
-    shuffle=False,
-)
-start_epoch = 0
-print("num_epochs: ", num_epochs)
+    startEpoch = 0
 
-for epoch in range(start_epoch, num_epochs):
+    if args.resume:
+        checkpoint = torch.load(args.resume, map_location=args.device)
+        model.load_state_dict(checkpoint["model"])
+        optimizer.load_state_dict(checkpoint["optimizer"])
+        startEpoch = checkpoint["epoch"]+1
+        bestLossTrain = checkpoint.get("lossTrain", 1e10)
+        bestLossVal = checkpoint.get("lossVal", 1e10)
+        print("Loaded checkpoint from: ", args.resume)
+        print("Loaded epoch: ", startEpoch)
+        print("Loaded bestLossTrain: ", bestLossTrain)
+        print("Loaded bestLossVal: ", bestLossVal)
+
+    return model, optimizer, startEpoch, bestLossTrain, bestLossVal
+
+
+def getDataLoaders(args):
+    train_dataset = PneumothoraxDataset(args.dir_dataset)
+    val_dataset = PneumothoraxDataset(args.dir_dataset, image_set="val")
+    sampler = PneumoSampler(args.dir_dataset)
+    print("Number of training samples: ", len(train_dataset))
+    print("Number of validation samples: ", len(val_dataset))
+    train_dataloader = DataLoader(
+        train_dataset,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        sampler=sampler,
+    )
+    val_dataloader = DataLoader(
+        val_dataset,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        shuffle=False,
+    )
+    return train_dataloader, val_dataloader
+
+
+def train(model, train_dataloader, seg_loss, ce_loss, optimizer, epoch, model_save_path, device, bestLoss):
     epoch_loss = 0
     pbar = tqdm(train_dataloader, desc=f"Train on epoch {epoch}")
     for step, (image, gt2D, boxes, _) in enumerate(pbar):
@@ -121,58 +132,141 @@ for epoch in range(start_epoch, num_epochs):
         optimizer.step()
         optimizer.zero_grad()
         epoch_loss += loss.item()
-        iter_num += 1
+        pbar.set_postfix(loss=loss.item())
 
     epoch_loss /= step
-    pbar.set_postfix(loss=loss.item())
-    losses.append(epoch_loss)
     checkpoint = {
-            "model": model.state_dict(),
-            "optimizer": optimizer.state_dict(),
-            "epoch": epoch,
-        }
-    torch.save(checkpoint, os.path.join(model_save_path, "sam_model_latest.pth"))
-    if epoch % 10 == 0:
-        pBarVal = tqdm(val_dataloader, desc=f"Val on epoch {epoch}")
-        val_loss = 0
-        for step, (image, gt2D, boxes, _) in enumerate(pBarVal):
-            boxes_np = boxes.detach().cpu().numpy()
-            image, gt2D = image.to(device), gt2D.to(device)
-            pred = model(image, boxes_np)
-            loss = seg_loss(pred, gt2D) + ce_loss(pred, gt2D.float())
-            val_loss += loss.item()
-        val_loss /= step
-        print("val_loss: ", val_loss)
-        pBarVal.set_postfix(loss=loss.item())
-        val_losses.append(val_loss)
-        if val_loss < best_val_loss:
-            best_loss = epoch_loss
-            checkpoint = {
-                "model": model.state_dict(),
-                "optimizer": optimizer.state_dict(),
-                "epoch": epoch,
-            }
-            torch.save(checkpoint, os.path.join(model_save_path, "sam_model_val_best.pth"))
-    print("epoch_loss: ", epoch_loss)   
-    if epoch_loss < best_loss:
-        best_loss = epoch_loss
+        "model": model.state_dict(),
+        "optimizer": optimizer.state_dict(),
+        "epoch": epoch,
+        "lossTrain": epoch_loss.item(),
+        "lossVal": 1e10,
+    }
+    torch.save(checkpoint, os.path.join(
+        model_save_path, "sam_model_latest.pth"))
+    print(f"epoch_loss at {epoch}: {epoch_loss}, bestLoss: {bestLoss}")
+    if epoch_loss < bestLoss:
+        bestLoss = epoch_loss
         checkpoint = {
             "model": model.state_dict(),
             "optimizer": optimizer.state_dict(),
             "epoch": epoch,
+            "lossTrain": bestLoss.item(),
+            "lossVal": 1e10,
         }
-        torch.save(checkpoint, os.path.join(model_save_path, "sam_model_train_best.pth"))
+        torch.save(checkpoint, os.path.join(
+            model_save_path, "sam_model_train_best.pth"))
 
-plt.plot(losses)
-plt.title("Dice + Cross Entropy Loss")
-plt.xlabel("Epoch")
-plt.ylabel("Loss")
-plt.savefig(os.path.join(model_save_path, args.task_name + "train_loss.png"))
-plt.close()
+    return epoch_loss, bestLoss
 
-plt.plot(val_losses)
-plt.title("Dice + Cross Entropy Loss")
-plt.xlabel("Epoch")
-plt.ylabel("Loss")
-plt.savefig(os.path.join(model_save_path, args.task_name + "val_loss.png"))
-plt.close()
+
+def val(model, val_dataloader, seg_loss, ce_loss, optimizer, epoch, model_save_path, device, bestValLoss):
+    model.eval()
+    valLoss = 0
+    pbar = tqdm(val_dataloader, desc=f"Val on epoch {epoch}")
+    for step, (image, gt2D, boxes, _) in enumerate(pbar):
+        boxes_np = boxes.detach().cpu().numpy()
+        image, gt2D = image.to(device), gt2D.to(device)
+        pred = model(image, boxes_np)
+        loss = seg_loss(pred, gt2D) + ce_loss(pred, gt2D.float())
+        valLoss += loss.item()
+        pbar.set_postfix(loss=loss.item())
+
+    valLoss /= step
+    print(f"valLoss at epoch {epoch}: {valLoss}, bestValLoss: {bestValLoss}")
+    if valLoss < bestValLoss:
+        bestValLoss = valLoss
+        checkpoint = {
+            "model": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "epoch": epoch,
+            "lossTrain": 1e10,
+            "lossVal": bestValLoss.item(),
+        }
+        torch.save(checkpoint, os.path.join(
+            model_save_path, "sam_model_val_best.pth"))
+    model.train()
+
+    return valLoss, bestValLoss
+
+
+def test(args):
+    model, _, _, _, _ = getModel(args)
+    device = torch.device(args.device)
+    model.eval()
+    test_dataset = PneumothoraxDataset(args.dir_dataset, image_set="val")
+    test_dataloader = DataLoader(
+        test_dataset,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        shuffle=False,
+    )
+    pbar = tqdm(test_dataloader, desc=f"Test")
+    totalScore = 0
+    for step, (image, gt2D, boxes, _) in enumerate(pbar):
+        boxes_np = boxes.detach().cpu().numpy()
+        image, gt2D = image.to(device), gt2D.to(device)
+        pred = model(image, boxes_np)
+        pred = torch.sigmoid(pred)
+        score = dice_metric(pred, gt2D)
+        totalScore += score.item()
+        pbar.set_postfix(score=score.item())
+
+    totalScore /= step
+    print("totalScore: ", totalScore)
+    return totalScore
+
+
+def main(args):
+    run_id = datetime.now().strftime("%Y%m%d-%H%M")
+    model_save_path = os.path.join(
+        args.work_dir, args.task_name + "-" + run_id)
+    device = torch.device(args.device)
+    os.makedirs(model_save_path, exist_ok=True)
+
+    model, optimizer, startEpoch, best_loss, best_val_loss = getModel(args)
+
+    seg_loss = monai.losses.DiceLoss(
+        sigmoid=True, squared_pred=True, reduction="mean")
+    ce_loss = nn.BCEWithLogitsLoss(reduction="mean")
+
+    train_dataloader, val_dataloader = getDataLoaders(args)
+
+    num_epochs = args.num_epochs
+    losses = []
+    val_losses = []
+    print("num_epochs: ", num_epochs)
+
+    for epoch in range(startEpoch, num_epochs):
+        epoch_loss, best_loss = train(model, train_dataloader, seg_loss,
+                                      ce_loss, optimizer, epoch, model_save_path, device, best_loss)
+        losses.append(epoch_loss)
+        if epoch % args.valEpoch == 0:
+            val_loss, best_val_loss = val(model, val_dataloader, seg_loss,
+                                          ce_loss, optimizer, epoch, model_save_path, device, best_val_loss)
+            val_losses.append(val_loss)
+
+    plt.plot(losses)
+    plt.title("Dice + Cross Entropy Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.savefig(os.path.join(model_save_path,
+                args.task_name + "train_loss.png"))
+    plt.close()
+
+    plt.plot(val_losses)
+    plt.title("Dice + Cross Entropy Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.savefig(os.path.join(model_save_path, args.task_name + "val_loss.png"))
+    plt.close()
+
+
+if __name__ == "__main__":
+    args = getArgs()
+    if args.mode == "train":
+        main(args)
+    elif args.mode == "test":
+        test(args)
+    else:
+        print("Invalid mode")

@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 
 from datasets.semantic_seg import PneumothoraxDataset
 
-def show_mask(mask, ax, random_color=False):
+def showMask(mask, ax, random_color=False):
     if random_color:
         color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
     else:
@@ -17,7 +17,7 @@ def show_mask(mask, ax, random_color=False):
     ax.imshow(mask_image)
 
 
-def show_box(box, ax):
+def showBox(box, ax):
     x0, y0 = box[0], box[1]
     w, h = box[2] - box[0], box[3] - box[1]
     ax.add_patch(
@@ -37,8 +37,8 @@ for step, (image, gt, bboxes, names_temp) in enumerate(tr_dataloader):
     pathImage1 = rootImade + '/' + names_temp[idx]
     os.system('cp ' + pathImage1 + ' ./result/image_test1.png')
     axs[0].imshow(image[idx].cpu().permute(1, 2, 0).numpy())
-    show_mask(gt[idx].cpu().numpy(), axs[0])
-    show_box(bboxes[idx].numpy(), axs[0])
+    showMask(gt[idx].cpu().numpy(), axs[0])
+    showBox(bboxes[idx].numpy(), axs[0])
     axs[0].axis("off")
     # set title
     axs[0].set_title(names_temp[idx])
@@ -46,8 +46,8 @@ for step, (image, gt, bboxes, names_temp) in enumerate(tr_dataloader):
     pathImage2 = rootImade + '/' + names_temp[idx]
     os.system('cp ' + pathImage2 + ' ./result/image_test2.png')
     axs[1].imshow(image[idx].cpu().permute(1, 2, 0).numpy())
-    show_mask(gt[idx].cpu().numpy(), axs[1])
-    show_box(bboxes[idx].numpy(), axs[1])
+    showMask(gt[idx].cpu().numpy(), axs[1])
+    showBox(bboxes[idx].numpy(), axs[1])
     axs[1].axis("off")
     # set title
     axs[1].set_title(names_temp[idx])

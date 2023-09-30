@@ -1,33 +1,6 @@
-import yaml
-import sys
 import os
 import numpy as np
 import torch
-import logging
-from pathlib import Path
-
-
-def load_yaml(file_name):
-    stream = open(file_name).read().strip()
-    config = yaml.load(stream, Loader=yaml.SafeLoader)
-    return config
-
-
-def init_logger(directory, log_file_name):
-    formatter = logging.Formatter(
-        '\n%(asctime)s\t%(message)s', datefmt='%m/%d/%Y %H:%M:%S')
-    log_path = Path(directory, log_file_name)
-    if log_path.exists():
-        log_path.unlink()
-
-    handler = logging.FileHandler(filename=log_path)
-    handler.setFormatter(formatter)
-
-    logger = logging.getLogger(log_file_name)
-    logger.setLevel(logging.INFO)
-    logger.addHandler(handler)
-    logger.addHandler(logging.StreamHandler(sys.stdout))
-    return logger
 
 
 def init_seed(SEED=42):
@@ -36,3 +9,28 @@ def init_seed(SEED=42):
     torch.manual_seed(SEED)
     torch.cuda.manual_seed(SEED)
     torch.backends.cuda.determinisitic = True
+
+import torch
+
+
+def soft_dice_loss(outputs, targets, per_image=False, per_channel=False):
+    batch_size, n_channels = outputs.size(0), outputs.size(1)
+
+    eps = 1e-6
+    n_parts = 1
+    if per_image:
+        n_parts = batch_size
+    if per_channel:
+        n_parts = batch_size * n_channels
+
+    dice_target = targets.contiguous().view(n_parts, -1).float()
+    dice_output = outputs.contiguous().view(n_parts, -1)
+    intersection = torch.sum(dice_output * dice_target, dim=1)
+    union = torch.sum(dice_output, dim=1) + torch.sum(dice_target, dim=1) + eps
+    loss = (1 - (2 * intersection + eps) / union).mean()
+    return loss
+
+
+def dice_metric(preds, trues, per_image=False, per_channel=False):
+    preds = preds.float()
+    return 1 - soft_dice_loss(preds, trues, per_image, per_channel)

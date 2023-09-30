@@ -9,8 +9,6 @@ from setuptools import find_packages, setup
 
 setup(
     name="Pneusam",
-    version="0.0.1",
-    author="Thanh Tran",
     python_requires=">=3.9",
     install_requires=["monai==1.2.0", "pandas==2.1.1", "matplotlib==3.8.0", "scikit-image==0.21.0", "SimpleITK>=2.2.1",
                       "nibabel==5.1.0", "tqdm==4.66.1", "scipy==1.11.3", "ipympl==0.9.3", "opencv-python==4.8.1.78",

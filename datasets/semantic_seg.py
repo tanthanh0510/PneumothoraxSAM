@@ -4,12 +4,10 @@ import numpy as np
 import pandas as pd
 import random
 
-from PIL import Image
 from skimage import io
-import torch
 
-from torch.utils.data import Dataset
-from torchvision.datasets import VOCSegmentation, VisionDataset
+import torch
+from torchvision.datasets import VisionDataset
 
 
 class PneumothoraxDataset(VisionDataset):
@@ -31,14 +29,15 @@ class PneumothoraxDataset(VisionDataset):
     def __init__(self, dataset_dir, usePromt, useRandom=1,
                  image_set='train',
                  data_prefix: dict = dict(img_path='train', ann_path='mask'),
-                 return_dict=False):
+                 return_dict=False, isDemo=False):
         super(PneumothoraxDataset, self).__init__(root=dataset_dir)
         self.class_names = ['pneumothorax']
         self.usePromt = usePromt
         self.useRandom = useRandom
         self.dataset = pd.read_csv(
             os.path.join(dataset_dir, image_set + '.csv'))
-        # self.dataset = self.dataset[self.dataset['existLabel'] == 1]
+        if isDemo:
+            self.dataset = self.dataset[self.dataset['existLabel'] == 1]
         self.dataset_dir = dataset_dir
         self.return_dict = return_dict
         self.img_folder_name = os.path.join(

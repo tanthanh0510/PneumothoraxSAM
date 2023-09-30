@@ -1,28 +1,26 @@
 import os
 import argparse
+import pandas as pd
 import matplotlib.pyplot as plt
-
 from typing import DefaultDict
 from tqdm import tqdm
 from datetime import datetime
 
-import pandas as pd
+
 
 import monai
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-import torch.nn.functional as F
 
 from segment_anything import sam_model_registry
 from segment_anything.model import PneuSam
 from datasets.semantic_seg import PneumothoraxDataset, PneumoSampler
 
-from losses import dice_metric
-
+from utils.helpers import init_seed, dice_metric
 from utils.mask_binarizers import TripletMaskBinarization
 # set seeds
-torch.manual_seed(49)
+init_seed()
 torch.cuda.empty_cache()
 
 
@@ -35,8 +33,8 @@ def getArgs():
         help="dir dataset",
     )
     parser.add_argument("-mode", type=str, default="train")
-    parser.add_argument("-usePromt", type=int, default=0)
-    parser.add_argument("-useRandom", type=int, default=1)
+    parser.add_argument("-usePromt", type=int, default=0, help="use prompt")
+    parser.add_argument("-useRandom", type=int, default=1, help="use random prompt for no mask")
     parser.add_argument("-valEpoch", type=int, default=10)
     parser.add_argument("-task_name", type=str, default="SAM-ViT-B")
     parser.add_argument("-model_type", type=str, default="vit_b")

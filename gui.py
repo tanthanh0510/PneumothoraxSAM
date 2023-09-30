@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import sys
 import time
 from PyQt5.QtGui import (
@@ -39,26 +38,26 @@ torch.cuda.manual_seed(2023)
 np.random.seed(2023)
 
 SAM_MODEL_TYPE = "vit_b"
-MedSAM_CKPT_PATH = "/home/thanhtran/workdir/project/finetune-anything/sam_ckpt/sam_vit_b_01ec64.pth"
+MedSAM_CKPT_PATH = "sam_ckpt/sam_vit_b_01ec64.pth"
 MEDSAM_IMG_INPUT_SIZE = 1024
-device = 'cpu'
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 @torch.no_grad()
-def medsam_inference(medsam_model, img_embed, box_1024, height, width):
+def medsamInference(model, imgEmbed, box_1024, height, width):
     box_torch = torch.as_tensor(
-        box_1024, dtype=torch.float, device=img_embed.device)
+        box_1024, dtype=torch.float, device=imgEmbed.device)
     if len(box_torch.shape) == 2:
         box_torch = box_torch[:, None, :]  # (B, 1, 4)
 
-    sparse_embeddings, dense_embeddings = medsam_model.prompt_encoder(
+    sparse_embeddings, dense_embeddings = model.prompt_encoder(
         points=None,
         boxes=box_torch,
         masks=None,
     )
-    low_res_logits, _ = medsam_model.mask_decoder(
-        image_embeddings=img_embed,  # (B, 256, 64, 64)
-        image_pe=medsam_model.prompt_encoder.get_dense_pe(),  # (1, 256, 64, 64)
+    low_res_logits, _ = model.mask_decoder(
+        image_embeddings=imgEmbed,  # (B, 256, 64, 64)
+        image_pe=model.prompt_encoder.get_dense_pe(),  # (1, 256, 64, 64)
         sparse_prompt_embeddings=sparse_embeddings,  # (B, 2, 256)
         dense_prompt_embeddings=dense_embeddings,  # (B, 256, 64, 64)
         multimask_output=False,
@@ -77,7 +76,7 @@ def medsam_inference(medsam_model, img_embed, box_1024, height, width):
     return medsam_seg
 
 
-print("Loading MedSAM model, a sec.")
+print("Loading MedSAM model")
 tic = time.perf_counter()
 
 # set up model
@@ -282,7 +281,7 @@ class Window(QWidget):
         # print("bounding box:", box_np)
         box_1024 = box_np / np.array([W, H, W, H]) * 1024
 
-        sam_mask = medsam_inference(
+        sam_mask = medsamInference(
             medsam_model, self.embedding, box_1024, H, W)
 
         self.prev_mask = self.mask_c.copy()
@@ -302,14 +301,12 @@ class Window(QWidget):
 
     @torch.no_grad()
     def get_embeddings(self):
-        print("Calculating embedding, gui may be unresponsive.")
         img_1024 = transform.resize(
             self.img_3c, (1024, 1024), order=3, preserve_range=True, anti_aliasing=True
         ).astype(np.uint8)
         img_1024 = (img_1024 - img_1024.min()) / np.clip(
             img_1024.max() - img_1024.min(), a_min=1e-8, a_max=None
-        )  # normalize to [0, 1], (H, W, 3)
-        # convert the shape to (3, H, W)
+        )
         img_1024_tensor = (
             torch.tensor(img_1024).float().permute(
                 2, 0, 1).unsqueeze(0).to(device)
